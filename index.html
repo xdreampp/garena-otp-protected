@@ -6,37 +6,39 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-start p-6">
-  <div class="w-full max-w-4xl bg-white rounded-xl shadow-lg p-6">
-    <h1 class="text-2xl font-bold mb-4 text-center">Garena OTP - Multi Account</h1>
+<body class="bg-gray-100 min-h-screen p-4">
+  <div class="max-w-3xl mx-auto bg-white shadow-lg rounded-xl p-6">
+    <h1 class="text-2xl font-bold mb-6 text-center">Garena OTP - Multi Account</h1>
 
-    <!-- Add new account -->
-    <div id="addForm" class="mb-6">
-      <div class="flex flex-col md:flex-row md:space-x-2 space-y-2 md:space-y-0">
-        <input id="accountName" type="text" placeholder="Account Name" class="border p-2 w-full rounded" />
-        <input id="accountSecret" type="text" placeholder="Base32 Secret (16 characters)" class="border p-2 w-full rounded" />
-      </div>
-      <button onclick="addAccount()" class="mt-3 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded w-full">Add Account</button>
+    <!-- Add account form -->
+    <div id="addForm" class="flex flex-col sm:flex-row gap-2 mb-6">
+      <input id="accountName" type="text" placeholder="Account Name" class="border rounded p-2 flex-1" />
+      <input id="accountSecret" type="text" placeholder="Base32 Secret (16 characters)" class="border rounded p-2 flex-1" />
+      <button onclick="addAccount()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded w-full sm:w-auto">Add</button>
     </div>
 
-    <!-- Account list -->
-    <div class="overflow-x-auto">
-      <table class="table-auto w-full text-left border rounded-lg shadow-sm">
-        <thead class="bg-gray-200 text-gray-700">
-          <tr>
-            <th class="p-3">Account</th>
-            <th class="p-3">OTP</th>
-            <th class="p-3">Progress</th>
-            <th class="p-3 text-center">Actions</th>
+    <!-- Account table (desktop) -->
+    <div class="hidden sm:block">
+      <table class="w-full table-auto border-collapse">
+        <thead>
+          <tr class="bg-gray-100 text-left">
+            <th class="p-2">Account</th>
+            <th class="p-2">OTP</th>
+            <th class="p-2">Progress</th>
+            <th class="p-2 text-center">Actions</th>
           </tr>
         </thead>
-        <tbody id="accountList" class="text-gray-800"></tbody>
+        <tbody id="accountTableBody"></tbody>
       </table>
     </div>
+
+    <!-- Card layout (mobile) -->
+    <div class="sm:hidden space-y-4" id="accountCardList"></div>
   </div>
 
   <script>
     let sharedVerified = false;
+    let otpIntervals = [];
 
     function base32ToBytes(base32) {
       const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -59,18 +61,15 @@
       const counterBytes = new ArrayBuffer(8);
       const view = new DataView(counterBytes);
       view.setUint32(4, counter);
-
       const keyCrypto = await crypto.subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
       const hmac = await crypto.subtle.sign("HMAC", keyCrypto, counterBytes);
       const hmacBytes = new Uint8Array(hmac);
-
       const offset = hmacBytes[hmacBytes.length - 1] & 0xf;
       const code =
         ((hmacBytes[offset] & 0x7f) << 24) |
         ((hmacBytes[offset + 1] & 0xff) << 16) |
         ((hmacBytes[offset + 2] & 0xff) << 8) |
         (hmacBytes[offset + 3] & 0xff);
-
       return (code % 1000000).toString().padStart(6, '0');
     }
 
@@ -105,13 +104,11 @@
     }
 
     function copyOTP(code) {
-      navigator.clipboard.writeText(code)
-        .then(() => alert("OTP copied to clipboard!"))
-        .catch(err => alert("Failed to copy: " + err));
+      navigator.clipboard.writeText(code).then(() => alert("OTP copied!"));
     }
 
     function shareAccount(account) {
-      const password = prompt("Set a 6-digit password to protect this link:");
+      const password = prompt("Set a 6-digit password:");
       if (!/^\d{6}$/.test(password)) {
         alert("Password must be 6 digits.");
         return;
@@ -122,10 +119,14 @@
     }
 
     async function renderAccounts() {
-      const container = document.getElementById("accountList");
-      container.innerHTML = "";
-      const now = Math.floor(Date.now() / 1000);
-      const counter = Math.floor(now / 30);
+      clearInterval(otpIntervals);
+      otpIntervals = [];
+
+      const tableBody = document.getElementById("accountTableBody");
+      const cardList = document.getElementById("accountCardList");
+      tableBody.innerHTML = "";
+      cardList.innerHTML = "";
+
       let accounts = [];
 
       if (location.hash.startsWith("#account=")) {
@@ -149,35 +150,61 @@
       } else {
         accounts = loadAccounts();
         sharedVerified = false;
-        document.getElementById("addForm").style.display = "block";
+        document.getElementById("addForm").style.display = "flex";
       }
 
       for (let i = 0; i < accounts.length; i++) {
         const acc = accounts[i];
-        const otp = await generateGarenaOTP(acc.secret, counter);
-        const progressPercent = ((30 - now % 30) / 30) * 100;
+        const rowId = `otp-${i}`;
+        const progId = `prog-${i}`;
 
-        container.innerHTML += `
-          <tr class="border-t hover:bg-gray-100 transition">
-            <td class="p-3 font-semibold">${acc.name}</td>
-            <td class="p-3 font-mono text-xl">${otp}</td>
-            <td class="p-3">
-              <div class="w-full bg-gray-300 h-2 rounded">
-                <div class="bg-green-500 h-2 rounded transition-all duration-500" style="width:${progressPercent}%"></div>
-              </div>
-            </td>
-            <td class="p-3 text-center space-x-1">
-              <button onclick="copyOTP('${otp}')" class="text-white bg-blue-500 hover:bg-blue-600 px-2 py-1 rounded text-sm">📋</button>
-              <button onclick='shareAccount(${JSON.stringify(acc)})' class="text-white bg-yellow-500 hover:bg-yellow-600 px-2 py-1 rounded text-sm">🔗</button>
-              ${location.hash ? "" : `<button onclick="deleteAccount(${i})" class="text-white bg-red-500 hover:bg-red-600 px-2 py-1 rounded text-sm">🗑️</button>`}
-            </td>
-          </tr>
+        // Desktop row
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td class="p-2">${acc.name}</td>
+          <td class="p-2 font-mono text-xl" id="${rowId}">Loading...</td>
+          <td class="p-2 w-40"><div class="h-2 bg-gray-300 rounded"><div id="${progId}" class="h-2 bg-green-500 rounded transition-all duration-200 w-0"></div></div></td>
+          <td class="p-2 text-center space-x-2">
+            <button onclick="copyOTP(document.getElementById('${rowId}').innerText)" class="bg-blue-500 text-white px-2 py-1 rounded text-sm">Copy</button>
+            <button onclick='shareAccount(${JSON.stringify(acc)})' class="bg-yellow-500 text-white px-2 py-1 rounded text-sm">Share</button>
+            ${location.hash ? '' : `<button onclick="deleteAccount(${i})" class="bg-red-500 text-white px-2 py-1 rounded text-sm">Delete</button>`}
+          </td>
         `;
+        tableBody.appendChild(row);
+
+        // Mobile card
+        const card = document.createElement("div");
+        card.className = "bg-gray-50 p-4 rounded-lg shadow";
+        card.innerHTML = `
+          <div class="font-bold mb-1">${acc.name}</div>
+          <div class="text-2xl font-mono mb-2" id="m-${rowId}">Loading...</div>
+          <div class="h-2 bg-gray-300 rounded mb-2"><div id="m-${progId}" class="h-2 bg-green-500 rounded transition-all duration-200 w-0"></div></div>
+          <div class="flex gap-2">
+            <button onclick="copyOTP(document.getElementById('m-${rowId}').innerText)" class="bg-blue-500 text-white px-3 py-1 rounded text-sm w-full">Copy</button>
+            <button onclick='shareAccount(${JSON.stringify(acc)})' class="bg-yellow-500 text-white px-3 py-1 rounded text-sm w-full">Share</button>
+            ${location.hash ? '' : `<button onclick="deleteAccount(${i})" class="bg-red-500 text-white px-3 py-1 rounded text-sm w-full">Del</button>`}
+          </div>
+        `;
+        cardList.appendChild(card);
+
+        // Update loop
+        const updateOTP = async () => {
+          const now = Math.floor(Date.now() / 1000);
+          const counter = Math.floor(now / 30);
+          const otp = await generateGarenaOTP(acc.secret, counter);
+          const progress = ((30 - now % 30) / 30) * 100;
+          document.getElementById(rowId).innerText = otp;
+          document.getElementById(`m-${rowId}`).innerText = otp;
+          document.getElementById(progId).style.width = `${progress}%`;
+          document.getElementById(`m-${progId}`).style.width = `${progress}%`;
+        };
+
+        updateOTP();
+        otpIntervals.push(setInterval(updateOTP, 1000));
       }
     }
 
     renderAccounts();
-    setInterval(renderAccounts, 1000);
   </script>
 </body>
 </html>
