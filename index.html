@@ -22,8 +22,6 @@
   </div>
 
   <script>
-    let sharedDecrypted = null;
-
     function base32ToBytes(base32) {
       const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
       const clean = base32.replace(/=+$/, '').toUpperCase().replace(/[^A-Z2-7]/g, '');
@@ -40,46 +38,23 @@
       return new Uint8Array(bytes);
     }
 
-    async function encryptData(data, password) {
-      const pwUtf8 = new TextEncoder().encode(password);
-      const pwHash = await crypto.subtle.digest("SHA-256", pwUtf8);
-      const iv = crypto.getRandomValues(new Uint8Array(12));
-      const alg = { name: "AES-GCM", iv };
-      const key = await crypto.subtle.importKey("raw", pwHash, alg, false, ["encrypt"]);
-      const dataUtf8 = new TextEncoder().encode(data);
-      const enc = await crypto.subtle.encrypt(alg, key, dataUtf8);
-      const encArray = new Uint8Array(enc);
-      const full = new Uint8Array(iv.byteLength + encArray.byteLength);
-      full.set(iv, 0);
-      full.set(encArray, iv.byteLength);
-      return btoa(String.fromCharCode(...full));
-    }
-
-    async function decryptData(encData, password) {
-      const data = atob(encData);
-      const bytes = new Uint8Array([...data].map(c => c.charCodeAt(0)));
-      const iv = bytes.slice(0, 12);
-      const encBytes = bytes.slice(12);
-      const pwUtf8 = new TextEncoder().encode(password);
-      const pwHash = await crypto.subtle.digest("SHA-256", pwUtf8);
-      const key = await crypto.subtle.importKey("raw", pwHash, { name: "AES-GCM", iv }, false, ["decrypt"]);
-      const dec = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, encBytes);
-      return JSON.parse(new TextDecoder().decode(dec));
-    }
-
     async function generateGarenaOTP(secretBase32, counter) {
       const key = base32ToBytes(secretBase32);
       const counterBytes = new ArrayBuffer(8);
       const view = new DataView(counterBytes);
       view.setUint32(4, counter);
+
       const keyCrypto = await crypto.subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
       const hmac = await crypto.subtle.sign("HMAC", keyCrypto, counterBytes);
       const hmacBytes = new Uint8Array(hmac);
+
       const offset = hmacBytes[hmacBytes.length - 1] & 0xf;
-      const code = ((hmacBytes[offset] & 0x7f) << 24) |
-                   ((hmacBytes[offset + 1] & 0xff) << 16) |
-                   ((hmacBytes[offset + 2] & 0xff) << 8) |
-                   (hmacBytes[offset + 3] & 0xff);
+      const code =
+        ((hmacBytes[offset] & 0x7f) << 24) |
+        ((hmacBytes[offset + 1] & 0xff) << 16) |
+        ((hmacBytes[offset + 2] & 0xff) << 8) |
+        (hmacBytes[offset + 3] & 0xff);
+
       return (code % 1000000).toString().padStart(6, '0');
     }
 
@@ -119,15 +94,19 @@
         .catch(err => alert("Failed to copy: " + err));
     }
 
-    async function shareAccount(account) {
+    function shareAccount(account) {
       const password = prompt("Enter a 6-digit password to protect this link:");
       if (!/^\d{6}$/.test(password)) {
-        alert("Invalid password");
+        alert("Invalid password. Must be exactly 6 digits.");
         return;
       }
-      const encrypted = await encryptData(JSON.stringify(account), password);
-      const url = `${location.origin}${location.pathname}?data=${encodeURIComponent(encrypted)}`;
-      prompt("Share this link (remember the 6-digit password):", url);
+      const data = {
+        ...account,
+        password
+      };
+      const encoded = btoa(JSON.stringify(data));
+      const url = `${location.origin}${location.pathname}#account=${encoded}`;
+      prompt("Share this link (recipient will need to enter the password):", url);
     }
 
     async function renderAccounts() {
@@ -136,28 +115,22 @@
       const now = Math.floor(Date.now() / 1000);
       const counter = Math.floor(now / 30);
       let accounts = [];
-      const urlParams = new URLSearchParams(location.search);
-      if (urlParams.has("data")) {
-        if (!sharedDecrypted) {
-          try {
-            const password = prompt("Enter 6-digit password to unlock:");
-            if (!/^\d{6}$/.test(password)) throw new Error("Invalid password format");
-            sharedDecrypted = await decryptData(urlParams.get("data"), password);
-            document.getElementById("addForm").style.display = "none";
 
-            const exitBtn = document.createElement("button");
-            exitBtn.textContent = "🔓 Exit Shared View";
-            exitBtn.className = "mb-4 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded w-full";
-            exitBtn.onclick = () => {
-              location.search = "";
-            };
-            container.appendChild(exitBtn);
-          } catch (e) {
-            alert("Incorrect or invalid shared link.");
+      if (location.hash.startsWith("#account=")) {
+        try {
+          const encoded = location.hash.replace("#account=", "");
+          const shared = JSON.parse(atob(encoded));
+          const input = prompt("Enter the 6-digit password:");
+          if (input !== shared.password) {
+            alert("Incorrect password.");
             return;
           }
+          accounts = [shared];
+          document.getElementById("addForm").style.display = "none";
+        } catch (e) {
+          alert("Invalid shared link");
+          return;
         }
-        accounts = [sharedDecrypted];
       } else {
         accounts = loadAccounts();
         document.getElementById("addForm").style.display = "block";
@@ -175,20 +148,31 @@
             <div class="text-3xl font-mono flex items-center space-x-2">
               <span>${otp}</span>
               <button onclick="copyOTP('${otp}')" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-sm">📋 Copy</button>
-              <button onclick='shareAccount(${JSON.stringify(acc)})' class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-sm">🔐 Share</button>
+              ${!location.hash ? `<button onclick='shareAccount(${JSON.stringify(acc)})' class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-sm">🔗 Share</button>` : ""}
             </div>
             <div class="h-1 bg-gray-300 mt-2 w-full">
               <div class="h-1 bg-green-500 transition-all duration-100" style="width:${((30 - now % 30) / 30) * 100}%"></div>
             </div>
           </div>
-          ${location.search ? "" : `<button onclick="deleteAccount(${i})" class="ml-4 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded">Delete</button>`}
+          ${location.hash ? "" : `<button onclick="deleteAccount(${i})" class="ml-4 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded">Delete</button>`}
         `;
         container.appendChild(div);
+      }
+
+      if (location.hash.startsWith("#account=")) {
+        const exitBtn = document.createElement("button");
+        exitBtn.textContent = "🚪 ออกจากโหมดแชร์";
+        exitBtn.className = "mt-4 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded";
+        exitBtn.onclick = () => {
+          location.hash = "";
+          location.reload();
+        };
+        container.appendChild(exitBtn);
       }
     }
 
     renderAccounts();
-    setInterval(renderAccounts, 1000);
+    setInterval(renderAccounts, 3000); // ทุก 3 วินาที
   </script>
 </body>
 </html>
