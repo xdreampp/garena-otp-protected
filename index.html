@@ -6,29 +6,33 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai&display=swap" rel="stylesheet">
   <style>
+    body {
+      font-family: 'Noto Sans Thai', sans-serif;
+    }
     .progress-bar {
       transition: width 1s linear, background-color 0.3s ease;
     }
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-4">
-  <div class="max-w-3xl mx-auto bg-white shadow-lg rounded-xl p-6">
-    <h1 class="text-2xl font-bold text-center mb-4">GARENAOTP XDREAM</h1>
+  <div class="max-w-3xl mx-auto bg-white shadow-2xl rounded-2xl p-6">
+    <h1 class="text-3xl font-bold text-center mb-6 text-blue-600">GARENAOTP XDREAM</h1>
 
-    <div id="addForm" class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
-      <input id="accountName" type="text" placeholder="ชื่อบัญชี" class="border p-2 rounded text-center" />
-      <input id="accountSecret" type="text" placeholder="Secret (16 ตัวอักษร)" class="border p-2 rounded" />
-      <button onclick="addAccount()" class="col-span-1 md:col-span-2 bg-blue-500 hover:bg-blue-600 text-white py-2 rounded">เพิ่มบัญชี</button>
+    <div id="addForm" class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+      <input id="accountName" type="text" placeholder="ชื่อบัญชี" class="border p-3 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-blue-400" />
+      <input id="accountSecret" type="text" placeholder="Secret (16 ตัวอักษร)" class="border p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400" />
+      <button onclick="addAccount()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg transition">➕ เพิ่มบัญชี</button>
     </div>
 
-    <div class="mb-2">
-      <input type="text" id="searchInput" placeholder="ค้นหาบัญชี..." class="w-full border p-2 rounded" oninput="renderAccounts()" />
+    <div class="mb-4">
+      <input type="text" id="searchInput" placeholder="🔍 ค้นหาบัญชี..." class="w-full border p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400" oninput="renderAccounts()" />
     </div>
 
-    <div id="accountTotal" class="text-sm text-gray-600 mb-4"></div>
+    <div id="accountTotal" class="text-sm text-gray-600 mb-4 text-right pr-1"></div>
 
-    <div id="accountList" class="space-y-4"></div>
+    <div id="accountList" class="space-y-5"></div>
   </div>
 
   <script>
@@ -80,10 +84,7 @@
 
     function formatThaiDate(isoString) {
       const date = new Date(isoString);
-      return date.toLocaleString("th-TH", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      });
+      return date.toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" });
     }
 
     function addAccount() {
@@ -161,13 +162,9 @@
       const bar = document.getElementById(`progress-${index}`);
       if (bar) {
         bar.style.width = `${percent}%`;
-        if (timeLeft > 40) {
-          bar.className = "absolute h-3 bg-green-500 rounded progress-bar";
-        } else if (timeLeft > 20) {
-          bar.className = "absolute h-3 bg-yellow-400 rounded progress-bar";
-        } else {
-          bar.className = "absolute h-3 bg-red-500 rounded progress-bar";
-        }
+        bar.className = `absolute h-3 rounded progress-bar ${
+          timeLeft > 40 ? 'bg-green-500' : timeLeft > 20 ? 'bg-yellow-400' : 'bg-red-500'
+        }`;
       }
       setTimeout(() => updateProgress(index), 1000);
     }
@@ -211,13 +208,13 @@
         const acc = accounts[i];
         const otp = await generateGarenaOTP(acc.secret, counter);
         const card = document.createElement("div");
-        card.className = "bg-gray-100 p-4 rounded-lg shadow";
+        card.className = "bg-white p-5 rounded-xl shadow-lg border border-gray-200";
         card.innerHTML = `
           <div class="flex flex-col md:flex-row justify-between items-center gap-4">
             <div class="text-center md:text-left flex-1">
-              <div class="font-bold text-xl">${acc.name}</div>
+              <div class="text-2xl font-semibold text-blue-700">${acc.name}</div>
               <div class="text-sm text-gray-500 mt-1">เพิ่มเมื่อ: ${acc.addedAt ? formatThaiDate(acc.addedAt) : "ไม่ทราบเวลา"}</div>
-              <div class="text-3xl font-mono mt-2">${otp}</div>
+              <div class="text-4xl font-mono mt-2 tracking-widest">${otp}</div>
               <div class="mt-2">
                 <button onclick="toggleSecret(${i})" class="text-blue-600 text-sm underline">
                   ${acc.showSecret ? "ซ่อน" : "แสดง"} Secret
@@ -231,9 +228,9 @@
               </div>
             </div>
             <div class="flex flex-col gap-2 w-full md:w-auto md:items-end">
-              <button onclick="copyOTP('${otp}')" class="bg-blue-500 hover:bg-blue-600 text-white py-1 px-4 rounded w-full">คัดลอก</button>
-              <button onclick='shareAccount(${JSON.stringify(acc)})' class="bg-yellow-500 hover:bg-yellow-600 text-white py-1 px-4 rounded w-full">แชร์</button>
-              ${location.hash ? "" : `<button onclick="deleteAccount(${i})" class="bg-red-500 hover:bg-red-600 text-white py-1 px-4 rounded w-full">ลบ</button>`}
+              <button onclick="copyOTP('${otp}')" class="bg-blue-500 hover:bg-blue-600 text-white py-1 px-4 rounded-lg w-full">คัดลอก</button>
+              <button onclick='shareAccount(${JSON.stringify(acc)})' class="bg-yellow-500 hover:bg-yellow-600 text-white py-1 px-4 rounded-lg w-full">แชร์</button>
+              ${location.hash ? "" : `<button onclick="deleteAccount(${i})" class="bg-red-500 hover:bg-red-600 text-white py-1 px-4 rounded-lg w-full">ลบ</button>`}
             </div>
           </div>
         `;
