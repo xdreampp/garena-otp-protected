@@ -5,6 +5,7 @@
   <title>GARENAOTP XDREAM</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://openfpcdn.io/fingerprintjs/v3"></script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai&display=swap" rel="stylesheet">
   <style>
@@ -37,6 +38,12 @@
 
   <script>
     let sharedVerified = false;
+
+    async function getHWID() {
+      const fp = await FingerprintJS.load();
+      const result = await fp.get();
+      return result.visitorId;
+    }
 
     function base32ToBytes(base32) {
       const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -87,15 +94,16 @@
       return date.toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" });
     }
 
-    function addAccount() {
+    async function addAccount() {
       const name = document.getElementById("accountName").value.trim();
       const secret = document.getElementById("accountSecret").value.trim().toUpperCase();
       if (!name || !/^[A-Z2-7]{16}$/.test(secret)) {
         Swal.fire("ผิดพลาด", "กรุณากรอกชื่อและ Secret 16 ตัวอักษรถูกต้อง", "error");
         return;
       }
+      const hwid = await getHWID();
       const accounts = loadAccounts();
-      accounts.push({ name, secret, showSecret: false, addedAt: new Date().toISOString() });
+      accounts.push({ name, secret, showSecret: false, addedAt: new Date().toISOString(), hwid });
       saveAccounts(accounts);
       document.getElementById("accountName").value = "";
       document.getElementById("accountSecret").value = "";
@@ -125,27 +133,6 @@
       navigator.clipboard.writeText(code)
         .then(() => Swal.fire("คัดลอกแล้ว", "OTP ถูกคัดลอกไปยังคลิปบอร์ด", "success"))
         .catch(err => Swal.fire("ผิดพลาด", err.message, "error"));
-    }
-
-    function shareAccount(account) {
-      Swal.fire({
-        title: "ตั้งรหัสผ่าน 6 หลัก",
-        input: "text",
-        inputPlaceholder: "เช่น 123456",
-        inputAttributes: { maxlength: 6, pattern: "\\d{6}" },
-        showCancelButton: true,
-        confirmButtonText: "สร้างลิงก์",
-      }).then(result => {
-        if (!result.isConfirmed) return;
-        const password = result.value.trim();
-        if (!/^\d{6}$/.test(password)) {
-          Swal.fire("ผิดพลาด", "รหัสผ่านต้องเป็นตัวเลข 6 หลัก", "error");
-          return;
-        }
-        const encoded = btoa(JSON.stringify({ ...account, password }));
-        const url = `${location.origin}${location.pathname}#account=${encoded}`;
-        Swal.fire("ลิงก์ที่ใช้แชร์", `<input class="w-full p-2 border rounded" value="${url}" readonly>`, "info");
-      });
     }
 
     function toggleSecret(index) {
@@ -196,8 +183,9 @@
         accounts = [sharedVerified];
         document.getElementById("addForm").style.display = "none";
       } else {
+        const hwid = await getHWID();
         accounts = loadAccounts();
-        accounts = accounts.filter(acc => acc.name.toLowerCase().includes(search));
+        accounts = accounts.filter(acc => acc.name.toLowerCase().includes(search) && acc.hwid === hwid);
         document.getElementById("addForm").style.display = "grid";
       }
 
@@ -237,6 +225,27 @@
         container.appendChild(card);
         updateProgress(i);
       }
+    }
+
+    function shareAccount(account) {
+      Swal.fire({
+        title: "ตั้งรหัสผ่าน 6 หลัก",
+        input: "text",
+        inputPlaceholder: "เช่น 123456",
+        inputAttributes: { maxlength: 6, pattern: "\\d{6}" },
+        showCancelButton: true,
+        confirmButtonText: "สร้างลิงก์",
+      }).then(result => {
+        if (!result.isConfirmed) return;
+        const password = result.value.trim();
+        if (!/^\d{6}$/.test(password)) {
+          Swal.fire("ผิดพลาด", "รหัสผ่านต้องเป็นตัวเลข 6 หลัก", "error");
+          return;
+        }
+        const encoded = btoa(JSON.stringify({ ...account, password }));
+        const url = `${location.origin}${location.pathname}#account=${encoded}`;
+        Swal.fire("ลิงก์ที่ใช้แชร์", `<input class="w-full p-2 border rounded" value="${url}" readonly>`, "info");
+      });
     }
 
     renderAccounts();
