@@ -7,7 +7,7 @@
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
-<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-start p-6">
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-start p-4">
   <div class="w-full max-w-2xl bg-white rounded-xl shadow-lg p-6">
     <h1 class="text-2xl font-bold mb-4 text-center">Garena OTP - Multi Account</h1>
 
@@ -18,12 +18,16 @@
       <button onclick="addAccount()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded w-full">Add Account</button>
     </div>
 
+    <!-- Search -->
+    <input id="searchInput" type="text" placeholder="ค้นหาชื่อบัญชี..." oninput="renderAccounts()" class="border p-2 w-full rounded mb-4" />
+
     <!-- Account list -->
-    <div id="accountList" class="overflow-x-auto"></div>
+    <div id="accountList" class="space-y-4"></div>
   </div>
 
   <script>
     let sharedVerified = false;
+    let otpElements = [];
 
     function base32ToBytes(base32) {
       const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -73,7 +77,7 @@
       const name = document.getElementById("accountName").value.trim();
       const secret = document.getElementById("accountSecret").value.trim().toUpperCase();
       if (!name || !/^[A-Z2-7]{16}$/.test(secret)) {
-        Swal.fire("ข้อมูลไม่ถูกต้อง", "กรุณากรอกชื่อและ Secret ที่ถูกต้อง (16 ตัวอักษร Base32)", "error");
+        Swal.fire("ข้อมูลไม่ถูกต้อง", "กรุณาใส่ชื่อและรหัส Base32 16 ตัว", "warning");
         return;
       }
       const accounts = loadAccounts();
@@ -93,103 +97,112 @@
 
     function copyOTP(code) {
       navigator.clipboard.writeText(code)
-        .then(() => Swal.fire("คัดลอกแล้ว", "รหัส OTP ถูกคัดลอกเรียบร้อยแล้ว", "success"))
-        .catch(err => Swal.fire("เกิดข้อผิดพลาด", err, "error"));
+        .then(() => Swal.fire("คัดลอกสำเร็จ", "OTP ถูกคัดลอกไปยังคลิปบอร์ดแล้ว", "success"))
+        .catch(err => Swal.fire("เกิดข้อผิดพลาด", err.message, "error"));
     }
 
     function shareAccount(account) {
       Swal.fire({
         title: "ตั้งรหัสผ่าน 6 หลัก",
         input: "text",
-        inputAttributes: { maxlength: 6, pattern: "\\d{6}", inputmode: "numeric" },
-        showCancelButton: true,
+        inputAttributes: { maxlength: 6, inputmode: "numeric" },
         inputValidator: (value) => {
-          if (!/^\d{6}$/.test(value)) return "รหัสผ่านต้องเป็นตัวเลข 6 หลักเท่านั้น";
+          if (!/^[0-9]{6}$/.test(value)) {
+            return "รหัสต้องมี 6 หลัก";
+          }
         }
       }).then(result => {
         if (result.isConfirmed) {
           const password = result.value;
           const encoded = btoa(JSON.stringify({ ...account, password }));
           const url = `${location.origin}${location.pathname}#account=${encoded}`;
-          Swal.fire("ลิงก์สำหรับแชร์", `<input type='text' value='${url}' readonly class='w-full p-2 border rounded' onclick='this.select()'>`, "info");
+          Swal.fire("แชร์ลิงก์นี้", `<input class='swal2-input' value='${url}' readonly>`, "info");
         }
       });
     }
 
-    let currentCounter = 0;
-    let currentOTPs = [];
-
     async function renderAccounts() {
       const container = document.getElementById("accountList");
+      container.innerHTML = "";
+      otpElements = [];
+
       const now = Math.floor(Date.now() / 1000);
       const counter = Math.floor(now / 30);
+      let accounts = [];
 
-      if (counter !== currentCounter) {
-        currentCounter = counter;
-
-        let accounts = [];
-        if (location.hash.startsWith("#account=")) {
-          if (!sharedVerified) {
-            try {
-              const encoded = location.hash.replace("#account=", "");
-              const shared = JSON.parse(atob(encoded));
-              const input = prompt("Enter the 6-digit password:");
-              if (input !== shared.password) {
-                alert("Incorrect password.");
-                return;
+      if (location.hash.startsWith("#account=")) {
+        if (!sharedVerified) {
+          try {
+            const encoded = location.hash.replace("#account=", "");
+            const shared = JSON.parse(atob(encoded));
+            const { value: input } = await Swal.fire({
+              title: "ใส่รหัสผ่าน 6 หลัก",
+              input: "text",
+              inputAttributes: { maxlength: 6, inputmode: "numeric" },
+              inputValidator: (value) => {
+                if (!/^[0-9]{6}$/.test(value)) return "รหัสต้องมี 6 หลัก";
               }
-              sharedVerified = shared;
-            } catch (e) {
-              alert("Invalid shared link");
+            });
+            if (input !== shared.password) {
+              Swal.fire("ผิดพลาด", "รหัสไม่ถูกต้อง", "error");
               return;
             }
+            sharedVerified = shared;
+          } catch (e) {
+            Swal.fire("ผิดพลาด", "ลิงก์ไม่ถูกต้อง", "error");
+            return;
           }
-          accounts = [sharedVerified];
-          document.getElementById("addForm").style.display = "none";
-        } else {
-          accounts = loadAccounts();
-          sharedVerified = false;
-          document.getElementById("addForm").style.display = "block";
         }
-
-        currentOTPs = await Promise.all(accounts.map(acc => generateGarenaOTP(acc.secret, counter)));
-
-        let html = `
-          <table class="table-auto w-full text-left border">
-            <thead>
-              <tr class="bg-gray-200">
-                <th class="px-4 py-2">ชื่อบัญชี</th>
-                <th class="px-4 py-2">รหัส OTP</th>
-                <th class="px-4 py-2 text-center">การจัดการ</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${accounts.map((acc, i) => `
-                <tr class="border-t">
-                  <td class="px-4 py-2">${acc.name}</td>
-                  <td class="px-4 py-2 font-mono text-xl" id="otp-${i}">${currentOTPs[i]}</td>
-                  <td class="px-4 py-2 text-center">
-                    <div class="flex flex-wrap justify-center gap-2">
-                      <button onclick="copyOTP('${currentOTPs[i]}')" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1 rounded text-sm">คัดลอก</button>
-                      <button onclick='shareAccount(${JSON.stringify(acc)})' class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-1 rounded text-sm">แชร์</button>
-                      ${location.hash ? "" : `<button onclick="deleteAccount(${i})" class="bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded text-sm">ลบ</button>`}
-                    </div>
-                  </td>
-                </tr>`).join('')}
-            </tbody>
-          </table>`;
-
-        container.innerHTML = html;
+        accounts = [sharedVerified];
+        document.getElementById("addForm").style.display = "none";
+        document.getElementById("searchInput").style.display = "none";
       } else {
-        currentOTPs.forEach((otp, i) => {
-          const el = document.getElementById(`otp-${i}`);
-          if (el) el.textContent = otp;
-        });
+        accounts = loadAccounts();
+        sharedVerified = false;
+        document.getElementById("addForm").style.display = "block";
+        document.getElementById("searchInput").style.display = "block";
+      }
+
+      const searchKeyword = document.getElementById("searchInput").value.toLowerCase();
+      accounts = accounts.filter(acc => acc.name.toLowerCase().includes(searchKeyword));
+
+      for (let i = 0; i < accounts.length; i++) {
+        const acc = accounts[i];
+        const otp = await generateGarenaOTP(acc.secret, counter);
+
+        const div = document.createElement("div");
+        div.className = "bg-gray-100 p-4 rounded-lg shadow";
+        div.innerHTML = `
+          <div class="font-bold text-lg mb-1">${acc.name}</div>
+          <div class="text-3xl font-mono" id="otp-${i}">${otp}</div>
+          <div class="h-1 bg-gray-300 mt-2 w-full rounded-full overflow-hidden">
+            <div id="bar-${i}" class="h-1 bg-green-500 transition-all duration-100"></div>
+          </div>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <button onclick="copyOTP('${otp}')" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1 rounded text-sm">คัดลอก</button>
+            <button onclick='shareAccount(${JSON.stringify(acc)})' class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-1 rounded text-sm">แชร์</button>
+            ${location.hash ? "" : `<button onclick="deleteAccount(${i})" class="bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded text-sm">ลบ</button>`}
+          </div>
+        `;
+        container.appendChild(div);
+        otpElements.push({ el: document.getElementById(`otp-${i}`), secret: acc.secret });
       }
     }
 
+    async function updateOTPs() {
+      const now = Math.floor(Date.now() / 1000);
+      const counter = Math.floor(now / 30);
+      for (let i = 0; i < otpElements.length; i++) {
+        const otp = await generateGarenaOTP(otpElements[i].secret, counter);
+        otpElements[i].el.innerText = otp;
+      }
+      const bars = document.querySelectorAll("[id^='bar-']");
+      const progress = ((30 - now % 30) / 30) * 100;
+      bars.forEach(bar => bar.style.width = `${progress}%`);
+    }
+
     renderAccounts();
-    setInterval(renderAccounts, 1000);
+    setInterval(updateOTPs, 1000);
   </script>
 </body>
 </html>
