@@ -8,30 +8,31 @@
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai&display=swap" rel="stylesheet">
   <style>
-    body {
-      font-family: 'Noto Sans Thai', sans-serif;
-    }
-    .progress-bar {
-      transition: width 1s linear, background-color 0.3s ease;
-    }
+    body { font-family: 'Noto Sans Thai', sans-serif; }
+    .progress-bar { transition: width 1s linear, background-color 0.3s ease; }
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-4">
   <div class="max-w-3xl mx-auto bg-white shadow-2xl rounded-2xl p-6">
     <h1 class="text-3xl font-bold text-center mb-6 text-blue-600">GARENAOTP XDREAM</h1>
 
-    <div id="addForm" class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
-      <input id="accountName" type="text" placeholder="ชื่อบัญชี" class="border p-3 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-blue-400" />
-      <input id="accountSecret" type="text" placeholder="Secret (16 ตัวอักษร)" class="border p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400" />
-      <button onclick="addAccount()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg transition">➕ เพิ่มบัญชี</button>
+    <!-- Add Form -->
+    <div id="addForm" class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
+      <input id="accountName" type="text" placeholder="ชื่อบัญชี" class="border p-3 rounded-lg text-center focus:ring-2 focus:ring-blue-400" />
+      <input id="accountSecret" type="text" placeholder="Secret (16 ตัวอักษร)" class="border p-3 rounded-lg text-center focus:ring-2 focus:ring-blue-400" />
+      <input id="accountGroup" type="text" placeholder="ชื่อกลุ่ม (เช่น ROV)" class="border p-3 rounded-lg text-center focus:ring-2 focus:ring-blue-400" />
+      <button onclick="addAccount()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg">➕ เพิ่มบัญชี</button>
     </div>
 
-    <div class="mb-4">
-      <input type="text" id="searchInput" placeholder="🔍 ค้นหาบัญชี..." class="w-full border p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400" oninput="renderAccounts()" />
+    <!-- Filters -->
+    <div class="flex flex-col md:flex-row gap-2 mb-4">
+      <input type="text" id="searchInput" placeholder="🔍 ค้นหาบัญชี..." class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-400" oninput="renderAccounts()" />
+      <select id="groupFilter" class="border p-3 rounded-lg focus:ring-2 focus:ring-blue-400" onchange="renderAccounts()">
+        <option value="">📁 ดูทุกกลุ่ม</option>
+      </select>
     </div>
 
     <div id="accountTotal" class="text-sm text-gray-600 mb-4 text-right pr-1"></div>
-
     <div id="accountList" class="space-y-5"></div>
   </div>
 
@@ -56,20 +57,19 @@
 
     async function generateGarenaOTP(secretBase32, counter) {
       const key = base32ToBytes(secretBase32);
-      const counterBytes = new ArrayBuffer(8);
-      const view = new DataView(counterBytes);
+      const buffer = new ArrayBuffer(8);
+      const view = new DataView(buffer);
       view.setUint32(4, counter);
 
       const keyCrypto = await crypto.subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
-      const hmac = await crypto.subtle.sign("HMAC", keyCrypto, counterBytes);
+      const hmac = await crypto.subtle.sign("HMAC", keyCrypto, buffer);
       const hmacBytes = new Uint8Array(hmac);
 
       const offset = hmacBytes[hmacBytes.length - 1] & 0xf;
-      const code =
-        ((hmacBytes[offset] & 0x7f) << 24) |
-        ((hmacBytes[offset + 1] & 0xff) << 16) |
-        ((hmacBytes[offset + 2] & 0xff) << 8) |
-        (hmacBytes[offset + 3] & 0xff);
+      const code = ((hmacBytes[offset] & 0x7f) << 24) |
+                   ((hmacBytes[offset + 1] & 0xff) << 16) |
+                   ((hmacBytes[offset + 2] & 0xff) << 8) |
+                   (hmacBytes[offset + 3] & 0xff);
 
       return (code % 1000000).toString().padStart(6, '0');
     }
@@ -83,34 +83,34 @@
     }
 
     function formatThaiDate(isoString) {
-      const date = new Date(isoString);
-      return date.toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" });
+      return new Date(isoString).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" });
     }
 
     function addAccount() {
       const name = document.getElementById("accountName").value.trim();
       const secret = document.getElementById("accountSecret").value.trim().toUpperCase();
+      const group = document.getElementById("accountGroup").value.trim();
       if (!name || !/^[A-Z2-7]{16}$/.test(secret)) {
         Swal.fire("ผิดพลาด", "กรุณากรอกชื่อและ Secret 16 ตัวอักษรถูกต้อง", "error");
         return;
       }
       const accounts = loadAccounts();
-      accounts.push({ name, secret, showSecret: false, addedAt: new Date().toISOString() });
+      accounts.unshift({ name, secret, group, showSecret: false, pinned: false, addedAt: new Date().toISOString() });
       saveAccounts(accounts);
       document.getElementById("accountName").value = "";
       document.getElementById("accountSecret").value = "";
+      document.getElementById("accountGroup").value = "";
       renderAccounts();
     }
 
     function deleteAccount(index) {
       Swal.fire({
-        title: "คุณแน่ใจหรือไม่?",
-        text: "การลบนี้จะไม่สามารถย้อนกลับได้",
+        title: "ลบบัญชี?",
+        text: "แน่ใจหรือไม่ว่าต้องการลบ?",
         icon: "warning",
         showCancelButton: true,
         confirmButtonColor: "#d33",
-        cancelButtonColor: "#3085d6",
-        confirmButtonText: "ใช่, ลบเลย!"
+        confirmButtonText: "ลบเลย"
       }).then(result => {
         if (result.isConfirmed) {
           const accounts = loadAccounts();
@@ -122,9 +122,9 @@
     }
 
     function copyOTP(code) {
-      navigator.clipboard.writeText(code)
-        .then(() => Swal.fire("คัดลอกแล้ว", "OTP ถูกคัดลอกไปยังคลิปบอร์ด", "success"))
-        .catch(err => Swal.fire("ผิดพลาด", err.message, "error"));
+      navigator.clipboard.writeText(code).then(() => {
+        Swal.fire("คัดลอกแล้ว", "OTP ถูกคัดลอกแล้ว", "success");
+      });
     }
 
     function shareAccount(account) {
@@ -155,6 +155,13 @@
       renderAccounts();
     }
 
+    function togglePin(index) {
+      const accounts = loadAccounts();
+      accounts[index].pinned = !accounts[index].pinned;
+      saveAccounts(accounts);
+      renderAccounts();
+    }
+
     function updateProgress(index) {
       const now = Math.floor(Date.now() / 1000);
       const timeLeft = 60 - (now % 60);
@@ -162,9 +169,7 @@
       const bar = document.getElementById(`progress-${index}`);
       if (bar) {
         bar.style.width = `${percent}%`;
-        bar.className = `absolute h-3 rounded progress-bar ${
-          timeLeft > 40 ? 'bg-green-500' : timeLeft > 20 ? 'bg-yellow-400' : 'bg-red-500'
-        }`;
+        bar.className = `absolute h-3 rounded progress-bar ${timeLeft > 40 ? 'bg-green-500' : timeLeft > 20 ? 'bg-yellow-400' : 'bg-red-500'}`;
       }
       setTimeout(() => updateProgress(index), 1000);
     }
@@ -172,9 +177,10 @@
     async function renderAccounts() {
       const container = document.getElementById("accountList");
       const totalDisplay = document.getElementById("accountTotal");
-      const now = Math.floor(Date.now() / 1000);
-      const counter = Math.floor(now / 60);
-      const search = document.getElementById("searchInput")?.value.toLowerCase() || "";
+      const groupSelect = document.getElementById("groupFilter");
+      const search = document.getElementById("searchInput").value.toLowerCase();
+      const groupFilter = groupSelect.value;
+
       let accounts = [];
 
       if (location.hash.startsWith("#account=")) {
@@ -196,14 +202,23 @@
         accounts = [sharedVerified];
         document.getElementById("addForm").style.display = "none";
       } else {
-        accounts = loadAccounts();
-        accounts = accounts.filter(acc => acc.name.toLowerCase().includes(search));
+        accounts = loadAccounts().filter(acc => acc.name.toLowerCase().includes(search));
+        if (groupFilter) {
+          accounts = accounts.filter(acc => acc.group === groupFilter);
+        }
+        accounts.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
         document.getElementById("addForm").style.display = "grid";
       }
 
-      totalDisplay.textContent = `จำนวนบัญชีทั้งหมด: ${accounts.length}`;
+      const groups = [...new Set(loadAccounts().map(acc => acc.group).filter(Boolean))];
+      groupSelect.innerHTML = `<option value="">📁 ดูทุกกลุ่ม</option>` + groups.map(g => `<option value="${g}" ${g === groupFilter ? 'selected' : ''}>📁 ${g}</option>`).join("");
 
+      totalDisplay.textContent = `จำนวนบัญชีทั้งหมด: ${accounts.length}`;
       container.innerHTML = "";
+
+      const now = Math.floor(Date.now() / 1000);
+      const counter = Math.floor(now / 60);
+
       for (let i = 0; i < accounts.length; i++) {
         const acc = accounts[i];
         const otp = await generateGarenaOTP(acc.secret, counter);
@@ -212,16 +227,14 @@
         card.innerHTML = `
           <div class="flex flex-col md:flex-row justify-between items-center gap-4">
             <div class="text-center md:text-left flex-1">
-              <div class="text-2xl font-semibold text-blue-700">${acc.name}</div>
-              <div class="text-sm text-gray-500 mt-1">เพิ่มเมื่อ: ${acc.addedAt ? formatThaiDate(acc.addedAt) : "ไม่ทราบเวลา"}</div>
+              <div class="text-2xl font-semibold text-blue-700">${acc.name} ${acc.group ? `<span class="text-sm text-gray-400">(${acc.group})</span>` : ''}</div>
+              <div class="text-sm text-gray-500 mt-1">เพิ่มเมื่อ: ${formatThaiDate(acc.addedAt)}</div>
               <div class="text-4xl font-mono mt-2 tracking-widest">${otp}</div>
-              <div class="mt-2">
-                <button onclick="toggleSecret(${i})" class="text-blue-600 text-sm underline">
-                  ${acc.showSecret ? "ซ่อน" : "แสดง"} Secret
-                </button>
-                <div class="font-mono text-sm mt-1 ${acc.showSecret ? "" : "hidden"}" id="secret-${i}">
-                  ${acc.secret}
-                </div>
+              <button onclick="toggleSecret(${i})" class="text-blue-600 text-sm underline mt-2">
+                ${acc.showSecret ? "ซ่อน" : "แสดง"} Secret
+              </button>
+              <div class="font-mono text-sm ${acc.showSecret ? "" : "hidden"}" id="secret-${i}">
+                ${acc.secret}
               </div>
               <div class="mt-3 relative h-3 bg-gray-300 rounded overflow-hidden w-full">
                 <div id="progress-${i}" class="absolute h-3 bg-green-500 rounded progress-bar" style="width: 100%"></div>
@@ -230,6 +243,9 @@
             <div class="flex flex-col gap-2 w-full md:w-auto md:items-end">
               <button onclick="copyOTP('${otp}')" class="bg-blue-500 hover:bg-blue-600 text-white py-1 px-4 rounded-lg w-full">คัดลอก</button>
               <button onclick='shareAccount(${JSON.stringify(acc)})' class="bg-yellow-500 hover:bg-yellow-600 text-white py-1 px-4 rounded-lg w-full">แชร์</button>
+              <button onclick="togglePin(${i})" class="bg-purple-500 hover:bg-purple-600 text-white py-1 px-4 rounded-lg w-full">
+                ${acc.pinned ? "ยกเลิกปักหมุด" : "📌 ปักหมุด"}
+              </button>
               ${location.hash ? "" : `<button onclick="deleteAccount(${i})" class="bg-red-500 hover:bg-red-600 text-white py-1 px-4 rounded-lg w-full">ลบ</button>`}
             </div>
           </div>
