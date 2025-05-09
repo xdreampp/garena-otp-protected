@@ -7,8 +7,9 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <style>
-    .fade-enter { opacity: 0; transform: scale(0.98); }
-    .fade-enter-active { opacity: 1; transform: scale(1); transition: opacity 0.3s ease, transform 0.3s ease; }
+    .progress-bar {
+      transition: width 1s linear, background-color 0.3s ease;
+    }
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-4">
@@ -139,6 +140,32 @@
       renderAccounts();
     }
 
+    function updateProgress(index) {
+      const now = Math.floor(Date.now() / 1000);
+      const timeLeft = 30 - (now % 30);
+      const percent = (timeLeft / 30) * 100;
+
+      const bar = document.getElementById(`progress-${index}`);
+      const timeText = document.getElementById(`timeleft-${index}`);
+
+      if (bar) {
+        bar.style.width = `${percent}%`;
+        if (timeLeft > 20) {
+          bar.className = "absolute h-2 bg-green-500 rounded progress-bar";
+        } else if (timeLeft > 10) {
+          bar.className = "absolute h-2 bg-yellow-400 rounded progress-bar";
+        } else {
+          bar.className = "absolute h-2 bg-red-500 rounded progress-bar";
+        }
+      }
+
+      if (timeText) {
+        timeText.textContent = `เหลือ ${timeLeft} วินาที`;
+      }
+
+      setTimeout(() => updateProgress(index), 1000);
+    }
+
     async function renderAccounts() {
       const container = document.getElementById("accountList");
       const now = Math.floor(Date.now() / 1000);
@@ -192,6 +219,10 @@
                   ${acc.secret}
                 </div>
               </div>
+              <div class="mt-2 relative h-2 bg-gray-300 rounded overflow-hidden">
+                <div id="progress-${i}" class="absolute h-2 bg-green-500 rounded progress-bar" style="width: 100%"></div>
+              </div>
+              <div id="timeleft-${i}" class="text-sm text-right text-gray-500 mt-1">เหลือ 30 วินาที</div>
             </div>
           </div>
           <div class="mt-4 flex gap-2 flex-wrap">
@@ -201,6 +232,7 @@
           </div>
         `;
         container.appendChild(card);
+        updateProgress(i);
       }
     }
 
