@@ -5,40 +5,32 @@
   <title>Garena OTP (Multi Account)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
-<body class="bg-gray-100 min-h-screen p-4">
-  <div class="max-w-3xl mx-auto bg-white shadow-lg rounded-xl p-6">
-    <h1 class="text-2xl font-bold mb-6 text-center">Garena OTP - Multi Account</h1>
-
-    <!-- Add account form -->
-    <div id="addForm" class="flex flex-col sm:flex-row gap-2 mb-6">
-      <input id="accountName" type="text" placeholder="Account Name" class="border rounded p-2 flex-1" />
-      <input id="accountSecret" type="text" placeholder="Base32 Secret (16 characters)" class="border rounded p-2 flex-1" />
-      <button onclick="addAccount()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded w-full sm:w-auto">Add</button>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-start p-6">
+  <div class="w-full max-w-2xl bg-white rounded-xl shadow-lg p-6">
+    <h1 class="text-2xl font-bold mb-4 text-center">Garena OTP - Multi Account</h1>
+    <div id="addForm" class="mb-4">
+      <input id="accountName" type="text" placeholder="Account Name" class="border p-2 w-1/2 rounded mr-2" />
+      <input id="accountSecret" type="text" placeholder="Base32 Secret (16 characters)" class="border p-2 w-1/2 rounded" />
+      <button onclick="addAccount()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded mt-2 w-full">Add Account</button>
     </div>
-
-    <!-- Account table (desktop) -->
-    <div class="hidden sm:block">
-      <table class="w-full table-auto border-collapse">
-        <thead>
-          <tr class="bg-gray-100 text-left">
-            <th class="p-2">Account</th>
-            <th class="p-2">OTP</th>
-            <th class="p-2">Progress</th>
-            <th class="p-2 text-center">Actions</th>
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm text-left">
+        <thead class="bg-gray-200">
+          <tr>
+            <th class="px-4 py-2">Name</th>
+            <th class="px-4 py-2">OTP</th>
+            <th class="px-4 py-2">Actions</th>
           </tr>
         </thead>
-        <tbody id="accountTableBody"></tbody>
+        <tbody id="accountList" class="bg-white divide-y divide-gray-200"></tbody>
       </table>
     </div>
-
-    <!-- Card layout (mobile) -->
-    <div class="sm:hidden space-y-4" id="accountCardList"></div>
   </div>
 
   <script>
     let sharedVerified = false;
-    let otpIntervals = [];
 
     function base32ToBytes(base32) {
       const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -65,11 +57,10 @@
       const hmac = await crypto.subtle.sign("HMAC", keyCrypto, counterBytes);
       const hmacBytes = new Uint8Array(hmac);
       const offset = hmacBytes[hmacBytes.length - 1] & 0xf;
-      const code =
-        ((hmacBytes[offset] & 0x7f) << 24) |
-        ((hmacBytes[offset + 1] & 0xff) << 16) |
-        ((hmacBytes[offset + 2] & 0xff) << 8) |
-        (hmacBytes[offset + 3] & 0xff);
+      const code = ((hmacBytes[offset] & 0x7f) << 24) |
+                   ((hmacBytes[offset + 1] & 0xff) << 16) |
+                   ((hmacBytes[offset + 2] & 0xff) << 8) |
+                   (hmacBytes[offset + 3] & 0xff);
       return (code % 1000000).toString().padStart(6, '0');
     }
 
@@ -85,7 +76,7 @@
       const name = document.getElementById("accountName").value.trim();
       const secret = document.getElementById("accountSecret").value.trim().toUpperCase();
       if (!name || !/^[A-Z2-7]{16}$/.test(secret)) {
-        alert("Name and valid 16-character Base32 secret required.");
+        Swal.fire("Error", "Name and valid 16-character Base32 secret required.", "error");
         return;
       }
       const accounts = loadAccounts();
@@ -104,45 +95,55 @@
     }
 
     function copyOTP(code) {
-      navigator.clipboard.writeText(code).then(() => alert("OTP copied!"));
+      navigator.clipboard.writeText(code).then(() => {
+        Swal.fire({ icon: 'success', title: 'Copied!', text: 'OTP has been copied.', timer: 1500, showConfirmButton: false });
+      });
     }
 
     function shareAccount(account) {
-      const password = prompt("Set a 6-digit password:");
-      if (!/^\d{6}$/.test(password)) {
-        alert("Password must be 6 digits.");
-        return;
-      }
-      const encoded = btoa(JSON.stringify({ ...account, password }));
-      const url = `${location.origin}${location.pathname}#account=${encoded}`;
-      prompt("Share this link:", url);
+      Swal.fire({
+        title: 'Set 6-digit password',
+        input: 'text',
+        inputAttributes: {
+          maxlength: 6,
+          pattern: '\\d{6}',
+          inputmode: 'numeric'
+        },
+        inputValidator: (value) => {
+          if (!/^[0-9]{6}$/.test(value)) return 'Must be 6 digits';
+        },
+        showCancelButton: true
+      }).then(result => {
+        if (result.isConfirmed) {
+          const password = result.value;
+          const encoded = btoa(JSON.stringify({ ...account, password }));
+          const url = `${location.origin}${location.pathname}#account=${encoded}`;
+          Swal.fire({ title: 'Share this link:', input: 'text', inputValue: url });
+        }
+      });
     }
 
     async function renderAccounts() {
-      clearInterval(otpIntervals);
-      otpIntervals = [];
-
-      const tableBody = document.getElementById("accountTableBody");
-      const cardList = document.getElementById("accountCardList");
-      tableBody.innerHTML = "";
-      cardList.innerHTML = "";
-
+      const tbody = document.getElementById("accountList");
+      tbody.innerHTML = "";
+      const now = Math.floor(Date.now() / 1000);
+      const counter = Math.floor(now / 30);
       let accounts = [];
 
       if (location.hash.startsWith("#account=")) {
         if (!sharedVerified) {
           try {
-            const encoded = location.hash.replace("#account=", "");
-            const shared = JSON.parse(atob(encoded));
-            const input = prompt("Enter the 6-digit password:");
-            if (input !== shared.password) {
-              alert("Incorrect password.");
-              return;
-            }
+            const shared = JSON.parse(atob(location.hash.replace("#account=", "")));
+            const { value: input } = await Swal.fire({
+              title: 'Enter 6-digit password',
+              input: 'password',
+              inputAttributes: { maxlength: 6, inputmode: 'numeric' },
+              inputValidator: (value) => !/^[0-9]{6}$/.test(value) && 'Must be 6 digits'
+            });
+            if (input !== shared.password) return Swal.fire('Error', 'Incorrect password.', 'error');
             sharedVerified = shared;
           } catch (e) {
-            alert("Invalid shared link");
-            return;
+            return Swal.fire('Error', 'Invalid shared link', 'error');
           }
         }
         accounts = [sharedVerified];
@@ -150,61 +151,27 @@
       } else {
         accounts = loadAccounts();
         sharedVerified = false;
-        document.getElementById("addForm").style.display = "flex";
+        document.getElementById("addForm").style.display = "block";
       }
 
       for (let i = 0; i < accounts.length; i++) {
         const acc = accounts[i];
-        const rowId = `otp-${i}`;
-        const progId = `prog-${i}`;
-
-        // Desktop row
+        const otp = await generateGarenaOTP(acc.secret, counter);
         const row = document.createElement("tr");
         row.innerHTML = `
-          <td class="p-2">${acc.name}</td>
-          <td class="p-2 font-mono text-xl" id="${rowId}">Loading...</td>
-          <td class="p-2 w-40"><div class="h-2 bg-gray-300 rounded"><div id="${progId}" class="h-2 bg-green-500 rounded transition-all duration-200 w-0"></div></div></td>
-          <td class="p-2 text-center space-x-2">
-            <button onclick="copyOTP(document.getElementById('${rowId}').innerText)" class="bg-blue-500 text-white px-2 py-1 rounded text-sm">Copy</button>
-            <button onclick='shareAccount(${JSON.stringify(acc)})' class="bg-yellow-500 text-white px-2 py-1 rounded text-sm">Share</button>
-            ${location.hash ? '' : `<button onclick="deleteAccount(${i})" class="bg-red-500 text-white px-2 py-1 rounded text-sm">Delete</button>`}
-          </td>
-        `;
-        tableBody.appendChild(row);
-
-        // Mobile card
-        const card = document.createElement("div");
-        card.className = "bg-gray-50 p-4 rounded-lg shadow";
-        card.innerHTML = `
-          <div class="font-bold mb-1">${acc.name}</div>
-          <div class="text-2xl font-mono mb-2" id="m-${rowId}">Loading...</div>
-          <div class="h-2 bg-gray-300 rounded mb-2"><div id="m-${progId}" class="h-2 bg-green-500 rounded transition-all duration-200 w-0"></div></div>
-          <div class="flex gap-2">
-            <button onclick="copyOTP(document.getElementById('m-${rowId}').innerText)" class="bg-blue-500 text-white px-3 py-1 rounded text-sm w-full">Copy</button>
-            <button onclick='shareAccount(${JSON.stringify(acc)})' class="bg-yellow-500 text-white px-3 py-1 rounded text-sm w-full">Share</button>
-            ${location.hash ? '' : `<button onclick="deleteAccount(${i})" class="bg-red-500 text-white px-3 py-1 rounded text-sm w-full">Del</button>`}
-          </div>
-        `;
-        cardList.appendChild(card);
-
-        // Update loop
-        const updateOTP = async () => {
-          const now = Math.floor(Date.now() / 1000);
-          const counter = Math.floor(now / 30);
-          const otp = await generateGarenaOTP(acc.secret, counter);
-          const progress = ((30 - now % 30) / 30) * 100;
-          document.getElementById(rowId).innerText = otp;
-          document.getElementById(`m-${rowId}`).innerText = otp;
-          document.getElementById(progId).style.width = `${progress}%`;
-          document.getElementById(`m-${progId}`).style.width = `${progress}%`;
-        };
-
-        updateOTP();
-        otpIntervals.push(setInterval(updateOTP, 1000));
+          <td class="px-4 py-2 font-medium">${acc.name}</td>
+          <td class="px-4 py-2 font-mono text-xl">${otp}</td>
+          <td class="px-4 py-2 space-x-2">
+            <button onclick="copyOTP('${otp}')" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded">📋</button>
+            <button onclick='shareAccount(${JSON.stringify(acc)})' class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded">🔗</button>
+            ${location.hash ? '' : `<button onclick="deleteAccount(${i})" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded">🗑️</button>`}
+          </td>`;
+        tbody.appendChild(row);
       }
     }
 
     renderAccounts();
+    setInterval(renderAccounts, 1000);
   </script>
 </body>
 </html>
