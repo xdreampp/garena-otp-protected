@@ -128,8 +128,8 @@
           return;
         }
         const encoded = btoa(JSON.stringify({ ...account, password }));
-        const url = ${location.origin}${location.pathname}#account=${encoded};
-        Swal.fire("ลิงก์ที่ใช้แชร์", <input class="w-full p-2 border rounded" value="${url}" readonly>, "info");
+        const url = `${location.origin}${location.pathname}#account=${encoded}`;
+        Swal.fire("ลิงก์ที่ใช้แชร์", `<input class="w-full p-2 border rounded" value="${url}" readonly>`, "info");
       });
     }
 
@@ -145,11 +145,11 @@
       const timeLeft = 30 - (now % 30);
       const percent = (timeLeft / 30) * 100;
 
-      const bar = document.getElementById(progress-${index});
-      const timeText = document.getElementById(timeleft-${index});
+      const bar = document.getElementById(`progress-${index}`);
+      const timeText = document.getElementById(`timeleft-${index}`);
 
       if (bar) {
-        bar.style.width = ${percent}%;
+        bar.style.width = `${percent}%`;
         if (timeLeft > 20) {
           bar.className = "absolute h-2 bg-green-500 rounded progress-bar";
         } else if (timeLeft > 10) {
@@ -160,7 +160,7 @@
       }
 
       if (timeText) {
-        timeText.textContent = เหลือ ${timeLeft} วินาที;
+        timeText.textContent = `เหลือ ${timeLeft} วินาที`;
       }
 
       setTimeout(() => updateProgress(index), 1000);
@@ -205,7 +205,7 @@
         const card = document.createElement("div");
         card.className = "bg-gray-100 p-4 rounded-lg shadow";
 
-        card.innerHTML = 
+        card.innerHTML = `
           <div class="flex justify-between items-center flex-wrap">
             <div>
               <div class="font-bold text-lg">${acc.name}</div>
@@ -228,9 +228,9 @@
           <div class="mt-4 flex gap-2 flex-wrap">
             <button onclick="copyOTP('${otp}')" class="bg-blue-500 text-white px-4 py-1 rounded">คัดลอก</button>
             <button onclick='shareAccount(${JSON.stringify(acc)})' class="bg-yellow-500 text-white px-4 py-1 rounded">แชร์</button>
-            ${location.hash ? "" : <button onclick="deleteAccount(${i})" class="bg-red-500 text-white px-4 py-1 rounded">ลบ</button>}
+            ${location.hash ? "" : `<button onclick="deleteAccount(${i})" class="bg-red-500 text-white px-4 py-1 rounded">ลบ</button>`}
           </div>
-        ;
+        `;
         container.appendChild(card);
         updateProgress(i);
       }
