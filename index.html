@@ -1,33 +1,35 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 <head>
   <meta charset="UTF-8" />
-  <title>Garena OTP (Multi Account)</title>
+  <title>Garena OTP - Multi Account</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    .fade-enter { opacity: 0; transform: scale(0.98); }
+    .fade-enter-active { opacity: 1; transform: scale(1); transition: opacity 0.3s ease, transform 0.3s ease; }
+  </style>
 </head>
-<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-start p-4">
-  <div class="w-full max-w-2xl bg-white rounded-xl shadow-lg p-6">
-    <h1 class="text-2xl font-bold mb-4 text-center">Garena OTP - Multi Account</h1>
+<body class="bg-gray-100 min-h-screen p-4">
+  <div class="max-w-3xl mx-auto bg-white shadow-lg rounded-xl p-6">
+    <h1 class="text-2xl font-bold text-center mb-4">Garena OTP - Multi Account</h1>
 
-    <!-- Add new account -->
-    <div id="addForm" class="mb-4">
-      <input id="accountName" type="text" placeholder="Account Name" class="border p-2 w-full rounded mb-2" />
-      <input id="accountSecret" type="text" placeholder="Base32 Secret (16 characters)" class="border p-2 w-full rounded mb-2" />
-      <button onclick="addAccount()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded w-full">Add Account</button>
+    <div id="addForm" class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
+      <input id="accountName" type="text" placeholder="ชื่อบัญชี" class="border p-2 rounded" />
+      <input id="accountSecret" type="text" placeholder="Base32 Secret (16 ตัวอักษร)" class="border p-2 rounded" />
+      <button onclick="addAccount()" class="col-span-1 md:col-span-2 bg-blue-500 hover:bg-blue-600 text-white py-2 rounded">เพิ่มบัญชี</button>
     </div>
 
-    <!-- Search -->
-    <input id="searchInput" type="text" placeholder="ค้นหาชื่อบัญชี..." oninput="renderAccounts()" class="border p-2 w-full rounded mb-4" />
+    <div class="mb-4">
+      <input type="text" id="searchInput" placeholder="ค้นหาบัญชี..." class="w-full border p-2 rounded" oninput="renderAccounts()" />
+    </div>
 
-    <!-- Account list -->
     <div id="accountList" class="space-y-4"></div>
   </div>
 
   <script>
     let sharedVerified = false;
-    let otpElements = [];
 
     function base32ToBytes(base32) {
       const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -77,11 +79,11 @@
       const name = document.getElementById("accountName").value.trim();
       const secret = document.getElementById("accountSecret").value.trim().toUpperCase();
       if (!name || !/^[A-Z2-7]{16}$/.test(secret)) {
-        Swal.fire("ข้อมูลไม่ถูกต้อง", "กรุณาใส่ชื่อและรหัส Base32 16 ตัว", "warning");
+        Swal.fire("ผิดพลาด", "กรุณากรอกชื่อและ Secret 16 ตัวอักษรถูกต้อง", "error");
         return;
       }
       const accounts = loadAccounts();
-      accounts.push({ name, secret });
+      accounts.push({ name, secret, showSecret: false });
       saveAccounts(accounts);
       document.getElementById("accountName").value = "";
       document.getElementById("accountSecret").value = "";
@@ -97,37 +99,43 @@
 
     function copyOTP(code) {
       navigator.clipboard.writeText(code)
-        .then(() => Swal.fire("คัดลอกสำเร็จ", "OTP ถูกคัดลอกไปยังคลิปบอร์ดแล้ว", "success"))
-        .catch(err => Swal.fire("เกิดข้อผิดพลาด", err.message, "error"));
+        .then(() => Swal.fire("คัดลอกแล้ว", "OTP ถูกคัดลอกไปยังคลิปบอร์ด", "success"))
+        .catch(err => Swal.fire("ผิดพลาด", err.message, "error"));
     }
 
     function shareAccount(account) {
       Swal.fire({
         title: "ตั้งรหัสผ่าน 6 หลัก",
         input: "text",
-        inputAttributes: { maxlength: 6, inputmode: "numeric" },
-        inputValidator: (value) => {
-          if (!/^[0-9]{6}$/.test(value)) {
-            return "รหัสต้องมี 6 หลัก";
-          }
-        }
+        inputPlaceholder: "เช่น 123456",
+        inputAttributes: { maxlength: 6, pattern: "\\d{6}" },
+        showCancelButton: true,
+        confirmButtonText: "สร้างลิงก์",
       }).then(result => {
-        if (result.isConfirmed) {
-          const password = result.value;
-          const encoded = btoa(JSON.stringify({ ...account, password }));
-          const url = `${location.origin}${location.pathname}#account=${encoded}`;
-          Swal.fire("แชร์ลิงก์นี้", `<input class='swal2-input' value='${url}' readonly>`, "info");
+        if (!result.isConfirmed) return;
+        const password = result.value.trim();
+        if (!/^\d{6}$/.test(password)) {
+          Swal.fire("ผิดพลาด", "รหัสผ่านต้องเป็นตัวเลข 6 หลัก", "error");
+          return;
         }
+        const encoded = btoa(JSON.stringify({ ...account, password }));
+        const url = `${location.origin}${location.pathname}#account=${encoded}`;
+        Swal.fire("ลิงก์ที่ใช้แชร์", `<input class="w-full p-2 border rounded" value="${url}" readonly>`, "info");
       });
+    }
+
+    function toggleSecret(index) {
+      const accounts = loadAccounts();
+      accounts[index].showSecret = !accounts[index].showSecret;
+      saveAccounts(accounts);
+      renderAccounts();
     }
 
     async function renderAccounts() {
       const container = document.getElementById("accountList");
-      container.innerHTML = "";
-      otpElements = [];
-
       const now = Math.floor(Date.now() / 1000);
       const counter = Math.floor(now / 30);
+      const search = document.getElementById("searchInput")?.value.toLowerCase() || "";
       let accounts = [];
 
       if (location.hash.startsWith("#account=")) {
@@ -135,74 +143,60 @@
           try {
             const encoded = location.hash.replace("#account=", "");
             const shared = JSON.parse(atob(encoded));
-            const { value: input } = await Swal.fire({
-              title: "ใส่รหัสผ่าน 6 หลัก",
-              input: "text",
-              inputAttributes: { maxlength: 6, inputmode: "numeric" },
-              inputValidator: (value) => {
-                if (!/^[0-9]{6}$/.test(value)) return "รหัสต้องมี 6 หลัก";
-              }
-            });
+            const input = prompt("กรอกรหัสผ่าน 6 หลัก:");
             if (input !== shared.password) {
-              Swal.fire("ผิดพลาด", "รหัสไม่ถูกต้อง", "error");
+              alert("รหัสไม่ถูกต้อง");
               return;
             }
             sharedVerified = shared;
-          } catch (e) {
-            Swal.fire("ผิดพลาด", "ลิงก์ไม่ถูกต้อง", "error");
+          } catch {
+            alert("ลิงก์แชร์ไม่ถูกต้อง");
             return;
           }
         }
         accounts = [sharedVerified];
         document.getElementById("addForm").style.display = "none";
-        document.getElementById("searchInput").style.display = "none";
       } else {
         accounts = loadAccounts();
-        sharedVerified = false;
-        document.getElementById("addForm").style.display = "block";
-        document.getElementById("searchInput").style.display = "block";
+        accounts = accounts.filter(acc => acc.name.toLowerCase().includes(search));
+        document.getElementById("addForm").style.display = "grid";
       }
 
-      const searchKeyword = document.getElementById("searchInput").value.toLowerCase();
-      accounts = accounts.filter(acc => acc.name.toLowerCase().includes(searchKeyword));
-
+      container.innerHTML = "";
       for (let i = 0; i < accounts.length; i++) {
         const acc = accounts[i];
         const otp = await generateGarenaOTP(acc.secret, counter);
 
-        const div = document.createElement("div");
-        div.className = "bg-gray-100 p-4 rounded-lg shadow";
-        div.innerHTML = `
-          <div class="font-bold text-lg mb-1">${acc.name}</div>
-          <div class="text-3xl font-mono" id="otp-${i}">${otp}</div>
-          <div class="h-1 bg-gray-300 mt-2 w-full rounded-full overflow-hidden">
-            <div id="bar-${i}" class="h-1 bg-green-500 transition-all duration-100"></div>
+        const card = document.createElement("div");
+        card.className = "bg-gray-100 p-4 rounded-lg shadow";
+
+        card.innerHTML = `
+          <div class="flex justify-between items-center flex-wrap">
+            <div>
+              <div class="font-bold text-lg">${acc.name}</div>
+              <div class="text-2xl font-mono mt-1">${otp}</div>
+              <div class="mt-1">
+                <button onclick="toggleSecret(${i})" class="text-blue-600 text-sm underline">
+                  ${acc.showSecret ? "ซ่อน" : "แสดง"} Secret
+                </button>
+                <div class="font-mono text-sm mt-1 ${acc.showSecret ? "" : "hidden"}" id="secret-${i}">
+                  ${acc.secret}
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="mt-4 flex flex-wrap gap-2">
-            <button onclick="copyOTP('${otp}')" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1 rounded text-sm">คัดลอก</button>
-            <button onclick='shareAccount(${JSON.stringify(acc)})' class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-1 rounded text-sm">แชร์</button>
-            ${location.hash ? "" : `<button onclick="deleteAccount(${i})" class="bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded text-sm">ลบ</button>`}
+          <div class="mt-4 flex gap-2 flex-wrap">
+            <button onclick="copyOTP('${otp}')" class="bg-blue-500 text-white px-4 py-1 rounded">คัดลอก</button>
+            <button onclick='shareAccount(${JSON.stringify(acc)})' class="bg-yellow-500 text-white px-4 py-1 rounded">แชร์</button>
+            ${location.hash ? "" : `<button onclick="deleteAccount(${i})" class="bg-red-500 text-white px-4 py-1 rounded">ลบ</button>`}
           </div>
         `;
-        container.appendChild(div);
-        otpElements.push({ el: document.getElementById(`otp-${i}`), secret: acc.secret });
+        container.appendChild(card);
       }
-    }
-
-    async function updateOTPs() {
-      const now = Math.floor(Date.now() / 1000);
-      const counter = Math.floor(now / 30);
-      for (let i = 0; i < otpElements.length; i++) {
-        const otp = await generateGarenaOTP(otpElements[i].secret, counter);
-        otpElements[i].el.innerText = otp;
-      }
-      const bars = document.querySelectorAll("[id^='bar-']");
-      const progress = ((30 - now % 30) / 30) * 100;
-      bars.forEach(bar => bar.style.width = `${progress}%`);
     }
 
     renderAccounts();
-    setInterval(updateOTPs, 1000);
+    setInterval(renderAccounts, 10000); // ลดความถี่ refresh เพื่อลดกระพริบ
   </script>
 </body>
 </html>
