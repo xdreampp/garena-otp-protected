@@ -17,14 +17,16 @@
     <h1 class="text-2xl font-bold text-center mb-4">GARENAOTP XDREAM</h1>
 
     <div id="addForm" class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
-      <input id="accountName" type="text" placeholder="ชื่อบัญชี" class="border p-2 rounded" />
+      <input id="accountName" type="text" placeholder="ชื่อบัญชี" class="border p-2 rounded text-center" />
       <input id="accountSecret" type="text" placeholder="Secret (16 ตัวอักษร)" class="border p-2 rounded" />
       <button onclick="addAccount()" class="col-span-1 md:col-span-2 bg-blue-500 hover:bg-blue-600 text-white py-2 rounded">เพิ่มบัญชี</button>
     </div>
 
-    <div class="mb-4">
+    <div class="mb-2">
       <input type="text" id="searchInput" placeholder="ค้นหาบัญชี..." class="w-full border p-2 rounded" oninput="renderAccounts()" />
     </div>
+
+    <div id="accountTotal" class="text-sm text-gray-600 mb-4"></div>
 
     <div id="accountList" class="space-y-4"></div>
   </div>
@@ -100,10 +102,22 @@
     }
 
     function deleteAccount(index) {
-      const accounts = loadAccounts();
-      accounts.splice(index, 1);
-      saveAccounts(accounts);
-      renderAccounts();
+      Swal.fire({
+        title: "คุณแน่ใจหรือไม่?",
+        text: "การลบนี้จะไม่สามารถย้อนกลับได้",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "ใช่, ลบเลย!"
+      }).then(result => {
+        if (result.isConfirmed) {
+          const accounts = loadAccounts();
+          accounts.splice(index, 1);
+          saveAccounts(accounts);
+          renderAccounts();
+        }
+      });
     }
 
     function copyOTP(code) {
@@ -160,10 +174,12 @@
 
     async function renderAccounts() {
       const container = document.getElementById("accountList");
+      const totalDisplay = document.getElementById("accountTotal");
       const now = Math.floor(Date.now() / 1000);
-      const counter = Math.floor(now / 60); // เปลี่ยนเป็นรอบ 60 วินาที
+      const counter = Math.floor(now / 60);
       const search = document.getElementById("searchInput")?.value.toLowerCase() || "";
       let accounts = [];
+
       if (location.hash.startsWith("#account=")) {
         if (!sharedVerified) {
           try {
@@ -187,6 +203,9 @@
         accounts = accounts.filter(acc => acc.name.toLowerCase().includes(search));
         document.getElementById("addForm").style.display = "grid";
       }
+
+      totalDisplay.textContent = `จำนวนบัญชีทั้งหมด: ${accounts.length}`;
+
       container.innerHTML = "";
       for (let i = 0; i < accounts.length; i++) {
         const acc = accounts[i];
@@ -196,7 +215,7 @@
         card.innerHTML = `
           <div class="flex flex-col md:flex-row justify-between items-center gap-4">
             <div class="text-center md:text-left flex-1">
-              <div class="font-bold text-lg">${acc.name}</div>
+              <div class="font-bold text-xl">${acc.name}</div>
               <div class="text-sm text-gray-500 mt-1">เพิ่มเมื่อ: ${acc.addedAt ? formatThaiDate(acc.addedAt) : "ไม่ทราบเวลา"}</div>
               <div class="text-3xl font-mono mt-2">${otp}</div>
               <div class="mt-2">
