@@ -7,34 +7,18 @@
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col items-center justify-start p-6">
-  <div class="w-full max-w-5xl bg-white rounded-xl shadow-lg p-6">
+  <div class="w-full max-w-2xl bg-white rounded-xl shadow-lg p-6">
     <h1 class="text-2xl font-bold mb-4 text-center">Garena OTP - Multi Account</h1>
 
     <!-- Add new account -->
-    <div id="addForm" class="mb-6">
-      <div class="flex flex-wrap gap-2 mb-2">
-        <input id="accountName" type="text" placeholder="Account Name" class="border p-2 w-full sm:w-1/3 rounded" />
-        <input id="accountSecret" type="text" placeholder="Base32 Secret (16 characters)" class="border p-2 w-full sm:w-2/3 rounded" />
-      </div>
-      <button onclick="addAccount()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded w-full sm:w-auto">Add Account</button>
+    <div id="addForm" class="mb-4">
+      <input id="accountName" type="text" placeholder="Account Name" class="border p-2 w-1/2 rounded mr-2" />
+      <input id="accountSecret" type="text" placeholder="Base32 Secret (16 characters)" class="border p-2 w-1/2 rounded" />
+      <button onclick="addAccount()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded mt-2 w-full">Add Account</button>
     </div>
 
-    <!-- Table display -->
-    <div class="overflow-x-auto">
-      <table class="min-w-full table-auto border border-gray-300 rounded-lg shadow-sm">
-        <thead class="bg-gray-100 text-gray-700 text-sm uppercase">
-          <tr>
-            <th class="px-4 py-3 text-left">Account</th>
-            <th class="px-4 py-3 text-left">OTP</th>
-            <th class="px-4 py-3 text-left">Progress</th>
-            <th class="px-4 py-3 text-left">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="accountList" class="divide-y divide-gray-200 bg-white text-sm">
-          <!-- JavaScript will render rows here -->
-        </tbody>
-      </table>
-    </div>
+    <!-- Account list -->
+    <div id="accountList" class="space-y-4"></div>
   </div>
 
   <script>
@@ -119,7 +103,7 @@
         return;
       }
       const encoded = btoa(JSON.stringify({ ...account, password }));
-      const url = `${location.origin}${location.pathname}#account=${encoded}`;
+      const url = ${location.origin}${location.pathname}#account=${encoded};
       prompt("Share this link:", url);
     }
 
@@ -128,8 +112,6 @@
       container.innerHTML = "";
       const now = Math.floor(Date.now() / 1000);
       const counter = Math.floor(now / 30);
-      const timeLeft = 30 - now % 30;
-      const progressPercent = (timeLeft / 30) * 100;
       let accounts = [];
 
       if (location.hash.startsWith("#account=")) {
@@ -160,25 +142,23 @@
         const acc = accounts[i];
         const otp = await generateGarenaOTP(acc.secret, counter);
 
-        const row = document.createElement("tr");
-        row.innerHTML = `
-          <td class="px-4 py-3 font-semibold text-gray-800">${acc.name}</td>
-          <td class="px-4 py-3 font-mono text-xl text-blue-700">${otp}</td>
-          <td class="px-4 py-3">
-            <div class="w-full h-2 bg-gray-300 rounded">
-              <div class="h-2 bg-green-500 rounded" style="width: ${progressPercent}%"></div>
+        const div = document.createElement("div");
+        div.className = "bg-gray-100 p-4 rounded-lg shadow flex items-center justify-between";
+        div.innerHTML = 
+          <div class="w-full">
+            <div class="font-bold">${acc.name}</div>
+            <div class="text-3xl font-mono flex items-center space-x-2">
+              <span>${otp}</span>
+              <button onclick="copyOTP('${otp}')" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-sm">📋 Copy</button>
+              <button onclick='shareAccount(${JSON.stringify(acc)})' class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-sm">🔗 Share</button>
             </div>
-            <div class="text-xs text-gray-500 mt-1 text-right">${timeLeft}s</div>
-          </td>
-          <td class="px-4 py-3 space-x-2 whitespace-nowrap">
-            <button onclick="copyOTP('${otp}')" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm">📋 Copy</button>
-            ${location.hash ? "" : `
-              <button onclick='shareAccount(${JSON.stringify(acc)})' class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded text-sm">🔗 Share</button>
-              <button onclick="deleteAccount(${i})" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm">🗑️ Delete</button>
-            `}
-          </td>
-        `;
-        container.appendChild(row);
+            <div class="h-1 bg-gray-300 mt-2 w-full">
+              <div class="h-1 bg-green-500 transition-all duration-100" style="width:${((30 - now % 30) / 30) * 100}%"></div>
+            </div>
+          </div>
+          ${location.hash ? "" : <button onclick="deleteAccount(${i})" class="ml-4 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded">Delete</button>}
+        ;
+        container.appendChild(div);
       }
     }
 
