@@ -22,6 +22,8 @@
   </div>
 
   <script>
+    let sharedVerified = false;
+
     function base32ToBytes(base32) {
       const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
       const clean = base32.replace(/=+$/, '').toUpperCase().replace(/[^A-Z2-7]/g, '');
@@ -95,15 +97,14 @@
     }
 
     function shareAccount(account) {
-      const password = prompt("Enter a 6-digit password to protect this link:");
+      const password = prompt("Set a 6-digit password to protect this link:");
       if (!/^\d{6}$/.test(password)) {
-        alert("Invalid password. Must be exactly 6 digits.");
+        alert("Password must be 6 digits.");
         return;
       }
-      const data = { ...account, password };
-      const encoded = btoa(JSON.stringify(data));
+      const encoded = btoa(JSON.stringify({ ...account, password }));
       const url = `${location.origin}${location.pathname}#account=${encoded}`;
-      prompt("Share this link (recipient will need to enter the password):", url);
+      prompt("Share this link:", url);
     }
 
     async function renderAccounts() {
@@ -114,22 +115,26 @@
       let accounts = [];
 
       if (location.hash.startsWith("#account=")) {
-        try {
-          const encoded = location.hash.replace("#account=", "");
-          const shared = JSON.parse(atob(encoded));
-          const input = prompt("Enter the 6-digit password:");
-          if (input !== shared.password) {
-            alert("Incorrect password.");
+        if (!sharedVerified) {
+          try {
+            const encoded = location.hash.replace("#account=", "");
+            const shared = JSON.parse(atob(encoded));
+            const input = prompt("Enter the 6-digit password:");
+            if (input !== shared.password) {
+              alert("Incorrect password.");
+              return;
+            }
+            sharedVerified = shared;
+          } catch (e) {
+            alert("Invalid shared link");
             return;
           }
-          accounts = [shared];
-          document.getElementById("addForm").style.display = "none";
-        } catch (e) {
-          alert("Invalid shared link");
-          return;
         }
+        accounts = [sharedVerified];
+        document.getElementById("addForm").style.display = "none";
       } else {
         accounts = loadAccounts();
+        sharedVerified = false;
         document.getElementById("addForm").style.display = "block";
       }
 
@@ -145,7 +150,7 @@
             <div class="text-3xl font-mono flex items-center space-x-2">
               <span>${otp}</span>
               <button onclick="copyOTP('${otp}')" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-sm">📋 Copy</button>
-              ${!location.hash ? `<button onclick='shareAccount(${JSON.stringify(acc)})' class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-sm">🔗 Share</button>` : ""}
+              <button onclick='shareAccount(${JSON.stringify(acc)})' class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-sm">🔗 Share</button>
             </div>
             <div class="h-1 bg-gray-300 mt-2 w-full">
               <div class="h-1 bg-green-500 transition-all duration-100" style="width:${((30 - now % 30) / 30) * 100}%"></div>
@@ -158,7 +163,7 @@
     }
 
     renderAccounts();
-    setInterval(renderAccounts, 3000); // Refresh every 3 seconds
+    setInterval(renderAccounts, 1000);
   </script>
 </body>
 </html>
