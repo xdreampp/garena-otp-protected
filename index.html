@@ -75,6 +75,14 @@
       localStorage.setItem("garenaAccounts", JSON.stringify(accounts));
     }
 
+    function formatThaiDate(isoString) {
+      const date = new Date(isoString);
+      return date.toLocaleString("th-TH", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      });
+    }
+
     function addAccount() {
       const name = document.getElementById("accountName").value.trim();
       const secret = document.getElementById("accountSecret").value.trim().toUpperCase();
@@ -83,7 +91,7 @@
         return;
       }
       const accounts = loadAccounts();
-      accounts.push({ name, secret, showSecret: false });
+      accounts.push({ name, secret, showSecret: false, addedAt: new Date().toISOString() });
       saveAccounts(accounts);
       document.getElementById("accountName").value = "";
       document.getElementById("accountSecret").value = "";
@@ -174,6 +182,7 @@
           <div class="flex justify-between items-center flex-wrap">
             <div>
               <div class="font-bold text-lg">${acc.name}</div>
+              <div class="text-sm text-gray-500 mt-1">เพิ่มเมื่อ: ${acc.addedAt ? formatThaiDate(acc.addedAt) : "ไม่ทราบเวลา"}</div>
               <div class="text-2xl font-mono mt-1">${otp}</div>
               <div class="mt-1">
                 <button onclick="toggleSecret(${i})" class="text-blue-600 text-sm underline">
@@ -196,7 +205,7 @@
     }
 
     renderAccounts();
-    setInterval(renderAccounts, 10000); // ลดความถี่ refresh เพื่อลดกระพริบ
+    setInterval(renderAccounts, 10000);
   </script>
 </body>
 </html>
