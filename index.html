@@ -100,10 +100,7 @@
         alert("Invalid password. Must be exactly 6 digits.");
         return;
       }
-      const data = {
-        ...account,
-        password
-      };
+      const data = { ...account, password };
       const encoded = btoa(JSON.stringify(data));
       const url = `${location.origin}${location.pathname}#account=${encoded}`;
       prompt("Share this link (recipient will need to enter the password):", url);
@@ -158,21 +155,10 @@
         `;
         container.appendChild(div);
       }
-
-      if (location.hash.startsWith("#account=")) {
-        const exitBtn = document.createElement("button");
-        exitBtn.textContent = "🚪 ออกจากโหมดแชร์";
-        exitBtn.className = "mt-4 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded";
-        exitBtn.onclick = () => {
-          location.hash = "";
-          location.reload();
-        };
-        container.appendChild(exitBtn);
-      }
     }
 
     renderAccounts();
-    setInterval(renderAccounts, 3000); // ทุก 3 วินาที
+    setInterval(renderAccounts, 3000); // Refresh every 3 seconds
   </script>
 </body>
 </html>
