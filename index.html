@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -95,10 +94,65 @@
         .catch(err => alert("Failed to copy: " + err));
     }
 
-    function shareAccount(account) {
-      const encoded = btoa(JSON.stringify(account));
-      const url = `${location.origin}${location.pathname}#account=${encoded}`;
-      prompt("Share this link:", url);
+    // 🔐 Encryption and Sharing
+    async function encryptData(data, password) {
+      const enc = new TextEncoder();
+      const pwKey = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]);
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+
+      const key = await crypto.subtle.deriveKey(
+        { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
+        pwKey,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["encrypt"]
+      );
+
+      const encrypted = await crypto.subtle.encrypt(
+        { name: "AES-GCM", iv },
+        key,
+        enc.encode(JSON.stringify(data))
+      );
+
+      const full = new Uint8Array([...salt, ...iv, ...new Uint8Array(encrypted)]);
+      return btoa(String.fromCharCode(...full));
+    }
+
+    async function decryptData(encryptedBase64, password) {
+      const binary = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0));
+      const salt = binary.slice(0, 16);
+      const iv = binary.slice(16, 28);
+      const data = binary.slice(28);
+
+      const enc = new TextEncoder();
+      const pwKey = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]);
+      const key = await crypto.subtle.deriveKey(
+        { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
+        pwKey,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["decrypt"]
+      );
+
+      const decrypted = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv },
+        key,
+        data
+      );
+
+      return JSON.parse(new TextDecoder().decode(decrypted));
+    }
+
+    async function shareAccount(account) {
+      const password = prompt("Enter 6-digit password to protect this link:");
+      if (!/^\d{6}$/.test(password)) {
+        alert("Password must be 6 digits.");
+        return;
+      }
+      const encrypted = await encryptData(account, password);
+      const url = `${location.origin}${location.pathname}?data=${encodeURIComponent(encrypted)}`;
+      prompt("Share this secure link:", url);
     }
 
     async function renderAccounts() {
@@ -108,13 +162,17 @@
       const counter = Math.floor(now / 30);
       let accounts = [];
 
-      if (location.hash.startsWith("#account=")) {
+      const urlParams = new URLSearchParams(location.search);
+      if (urlParams.has("data")) {
         try {
-          const single = JSON.parse(atob(location.hash.replace("#account=", "")));
+          const password = prompt("Enter 6-digit password to unlock this account:");
+          if (!/^\d{6}$/.test(password)) throw new Error("Invalid password format");
+          const single = await decryptData(urlParams.get("data"), password);
           accounts = [single];
           document.getElementById("addForm").style.display = "none";
         } catch (e) {
-          alert("Invalid shared link");
+          alert("Invalid or incorrect password for shared link.");
+          return;
         }
       } else {
         accounts = loadAccounts();
@@ -133,13 +191,13 @@
             <div class="text-3xl font-mono flex items-center space-x-2">
               <span>${otp}</span>
               <button onclick="copyOTP('${otp}')" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-sm">📋 Copy</button>
-              <button onclick='shareAccount(${JSON.stringify(acc)})' class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-sm">🔗 Share</button>
+              <button onclick='shareAccount(${JSON.stringify(acc)})' class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-sm">🔐 Share</button>
             </div>
             <div class="h-1 bg-gray-300 mt-2 w-full">
               <div class="h-1 bg-green-500 transition-all duration-100" style="width:${((30 - now % 30) / 30) * 100}%"></div>
             </div>
           </div>
-          ${location.hash ? "" : `<button onclick="deleteAccount(${i})" class="ml-4 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded">Delete</button>`}
+          ${location.search ? "" : `<button onclick="deleteAccount(${i})" class="ml-4 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded">Delete</button>`}
         `;
         container.appendChild(div);
       }
