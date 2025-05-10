@@ -36,8 +36,26 @@
     <div id="accountList" class="space-y-5"></div>
   </div>
 
+  <!-- Edit Modal -->
+  <div id="editModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 overflow-y-auto">
+    <div class="flex min-h-screen items-center justify-center px-4 py-10">
+      <div id="editModalContent" class="bg-white w-full max-w-lg p-6 rounded-2xl shadow-xl relative">
+        <h2 class="text-xl font-bold text-blue-600 mb-4">แก้ไขบัญชี</h2>
+        <input id="editName" class="w-full mb-3 p-3 border rounded-lg" placeholder="ชื่อบัญชี">
+        <input id="editSecret" class="w-full mb-3 p-3 border rounded-lg" placeholder="Secret (16 ตัวอักษร)">
+        <input id="editGroup" class="w-full mb-4 p-3 border rounded-lg" placeholder="ชื่อกลุ่ม">
+        <div class="flex justify-end gap-3">
+          <button onclick="closeEditModal()" class="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400">ยกเลิก</button>
+          <button onclick="saveEditAccount()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">บันทึก</button>
+        </div>
+        <button onclick="closeEditModal()" class="absolute top-2 right-2 text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let sharedVerified = false;
+    let editAccountIndex = null;
 
     function base32ToBytes(base32) {
       const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -139,6 +157,49 @@
       setTimeout(() => updateProgress(index), 1000);
     }
 
+    function openEditModal(index) {
+      const accounts = loadAccounts();
+      const acc = accounts[index];
+      document.getElementById("editName").value = acc.name;
+      document.getElementById("editSecret").value = acc.secret;
+      document.getElementById("editGroup").value = acc.group || "";
+      editAccountIndex = index;
+      document.getElementById("editModal").classList.remove("hidden");
+      document.getElementById("editModal").classList.add("flex");
+    }
+
+    function closeEditModal() {
+      document.getElementById("editModal").classList.remove("flex");
+      document.getElementById("editModal").classList.add("hidden");
+    }
+
+    function saveEditAccount() {
+      const name = document.getElementById("editName").value.trim();
+      const secret = document.getElementById("editSecret").value.trim().toUpperCase();
+      const group = document.getElementById("editGroup").value.trim();
+      if (!name || !/^[A-Z2-7]{16}$/.test(secret)) {
+        Swal.fire("ผิดพลาด", "ชื่อบัญชี และ Secret 16 ตัวอักษรต้องถูกต้อง", "error");
+        return;
+      }
+      const accounts = loadAccounts();
+      accounts[editAccountIndex] = { ...accounts[editAccountIndex], name, secret, group };
+      saveAccounts(accounts);
+      closeEditModal();
+      renderAccounts();
+    }
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") {
+        closeEditModal();
+      }
+    });
+
+    document.getElementById("editModal").addEventListener("click", function (e) {
+      if (!document.getElementById("editModalContent").contains(e.target)) {
+        closeEditModal();
+      }
+    });
+
     async function renderAccounts() {
       const container = document.getElementById("accountList");
       const totalDisplay = document.getElementById("accountTotal");
@@ -152,7 +213,8 @@
       }
 
       const groups = [...new Set(loadAccounts().map(acc => acc.group).filter(Boolean))];
-      groupSelect.innerHTML = `<option value="">📁 ดูทุกกลุ่ม</option>` + groups.map(g => `<option value="${g}" ${g === groupFilter ? 'selected' : ''}>📁 ${g}</option>`).join("");
+      groupSelect.innerHTML = `<option value="">📁 ดูทุกกลุ่ม</option>` +
+        groups.map(g => `<option value="${g}" ${g === groupFilter ? 'selected' : ''}>📁 ${g}</option>`).join("");
 
       totalDisplay.textContent = `จำนวนบัญชีทั้งหมด : ${accounts.length}`;
       container.innerHTML = "";
@@ -176,6 +238,7 @@
           </div>
           <div class="mt-4 flex flex-col md:flex-row gap-3">
             <button onclick="copyOTP('${otp}')" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg">คัดลอก</button>
+            <button onclick="openEditModal(${i})" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-4 rounded-lg">แก้ไข</button>
             <button onclick="deleteAccount(${i})" class="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-lg">ลบ</button>
           </div>
         `;
