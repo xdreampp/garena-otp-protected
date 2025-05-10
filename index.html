@@ -127,13 +127,6 @@
       });
     }
 
-    function toggleSecret(index) {
-      const accounts = loadAccounts();
-      accounts[index].showSecret = !accounts[index].showSecret;
-      saveAccounts(accounts);
-      renderAccounts();
-    }
-
     function editAccount(index) {
       const accounts = loadAccounts();
       const acc = accounts[index];
@@ -227,12 +220,6 @@
               <div class="text-2xl font-semibold text-blue-700">${acc.name} ${acc.group ? `<span class="text-sm text-gray-400">(${acc.group})</span>` : ''}</div>
               <div class="text-sm text-gray-500 mt-1">เพิ่มเมื่อ: ${formatThaiDate(acc.addedAt)}</div>
               <div class="text-4xl font-mono mt-2 tracking-widest">${otp}</div>
-              <button onclick="toggleSecret(${i})" class="text-blue-600 text-sm underline mt-2">
-                ${acc.showSecret ? "ซ่อน" : "แสดง"} Secret
-              </button>
-              <div class="font-mono text-sm ${acc.showSecret ? "" : "hidden"}" id="secret-${i}">
-                ${acc.secret}
-              </div>
               <div class="mt-3 relative h-3 bg-gray-300 rounded overflow-hidden w-full">
                 <div id="progress-${i}" class="absolute h-3 bg-green-500 rounded progress-bar" style="width: 100%"></div>
               </div>
