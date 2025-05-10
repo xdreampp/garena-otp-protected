@@ -154,7 +154,7 @@
       const groups = [...new Set(loadAccounts().map(acc => acc.group).filter(Boolean))];
       groupSelect.innerHTML = `<option value="">📁 ดูทุกกลุ่ม</option>` + groups.map(g => `<option value="${g}" ${g === groupFilter ? 'selected' : ''}>📁 ${g}</option>`).join("");
 
-      totalDisplay.textContent = `จำนวนบัญชีทั้งหมด: ${accounts.length}`;
+      totalDisplay.textContent = `จำนวนบัญชีทั้งหมด : ${accounts.length}`;
       container.innerHTML = "";
 
       const now = Math.floor(Date.now() / 1000);
