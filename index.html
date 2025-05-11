@@ -176,12 +176,51 @@
           </div>
           <div class="mt-4 flex flex-col md:flex-row gap-3">
             <button onclick="copyOTP('${otp}')" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg">คัดลอก</button>
+            <button onclick="editAccount(${i})" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-4 rounded-lg">แก้ไข</button>
             <button onclick="deleteAccount(${i})" class="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-lg">ลบ</button>
           </div>
         `;
         container.appendChild(card);
         updateProgress(i);
       }
+    }
+
+    function editAccount(index) {
+      const accounts = loadAccounts();
+      const acc = accounts[index];
+
+      Swal.fire({
+        title: 'แก้ไขบัญชี',
+        html:
+          `<input id="edit-name" class="swal2-input" placeholder="ชื่อบัญชี" value="${acc.name}">
+           <input id="edit-secret" class="swal2-input" placeholder="Secret 16 ตัว" value="${acc.secret}">
+           <input id="edit-group" class="swal2-input" placeholder="ชื่อกลุ่ม" value="${acc.group || ''}">`,
+        focusConfirm: false,
+        preConfirm: () => {
+          const name = document.getElementById("edit-name").value.trim();
+          const secret = document.getElementById("edit-secret").value.trim().toUpperCase();
+          const group = document.getElementById("edit-group").value.trim();
+
+          if (!name || !/^[A-Z2-7]{16}$/.test(secret)) {
+            Swal.showValidationMessage("ชื่อบัญชีหรือ Secret ไม่ถูกต้อง");
+            return false;
+          }
+
+          return { name, secret, group };
+        },
+        showCancelButton: true,
+        confirmButtonText: 'บันทึก',
+        cancelButtonText: 'ยกเลิก',
+      }).then(result => {
+        if (result.isConfirmed && result.value) {
+          accounts[index].name = result.value.name;
+          accounts[index].secret = result.value.secret;
+          accounts[index].group = result.value.group;
+          saveAccounts(accounts);
+          renderAccounts();
+          Swal.fire("สำเร็จ", "แก้ไขข้อมูลเรียบร้อยแล้ว", "success");
+        }
+      });
     }
 
     renderAccounts();
