@@ -11,6 +11,7 @@
   <style>
     body { font-family: 'Noto Sans Thai', sans-serif; }
     .progress-bar { transition: width 1s linear, background-color 0.3s ease; }
+    #mainApp { display: none; }
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-4">
@@ -19,7 +20,7 @@
 
     <!-- Google Login -->
     <div id="g_id_onload"
-         data-client_id="283261162263-o3h6kpffokv7njhb4os3abu5n5cv56qb.apps.googleusercontent.com"
+         data-client_id="YOUR_CLIENT_ID"
          data-callback="handleGoogleLogin"
          data-auto_prompt="false">
     </div>
@@ -32,12 +33,16 @@
          data-logo_alignment="left">
     </div>
 
-    <!-- Add Form -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-3 my-6">
-      <input id="accountName" type="text" placeholder="ชื่อบัญชี" class="border p-3 rounded-lg text-center" />
-      <input id="accountSecret" type="text" placeholder="Secret (16 ตัวอักษร)" class="border p-3 rounded-lg text-center" />
-      <input id="accountGroup" type="text" placeholder="ชื่อกลุ่ม" class="border p-3 rounded-lg text-center" />
-      <button onclick="addAccount()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg">เพิ่มบัญชี</button>
+    <!-- Main App Section (hidden until login) -->
+    <div id="mainApp">
+      <!-- Add Form -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-3 my-6">
+        <input id="accountName" type="text" placeholder="ชื่อบัญชี" class="border p-3 rounded-lg text-center" />
+        <input id="accountSecret" type="text" placeholder="Secret (16 ตัวอักษร)" class="border p-3 rounded-lg text-center" />
+        <input id="accountGroup" type="text" placeholder="ชื่อกลุ่ม" class="border p-3 rounded-lg text-center" />
+        <button onclick="addAccount()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg">เพิ่มบัญชี</button>
+      </div>
+      <!-- คุณสามารถเพิ่มส่วนแสดงบัญชี หรือประวัติ OTP ได้ที่นี่ -->
     </div>
   </div>
 
@@ -47,7 +52,11 @@
     function handleGoogleLogin(response) {
       const jwt = parseJwt(response.credential);
       currentUserEmail = jwt.email;
-      Swal.fire("ยินดีต้อนรับ", `คุณล็อกอินเป็น ${currentUserEmail}`, "success");
+
+      Swal.fire("ยินดีต้อนรับ", `คุณล็อกอินเป็น ${currentUserEmail}`, "success").then(() => {
+        document.getElementById("mainApp").style.display = "block";
+        renderAccounts(); // หากคุณมีระบบแสดงบัญชี
+      });
     }
 
     function parseJwt(token) {
@@ -109,6 +118,10 @@
           "Content-Type": "application/json"
         }
       });
+    }
+
+    function renderAccounts() {
+      // หากคุณมีฟังก์ชันดึงข้อมูลบัญชีจาก Google Sheets ให้ใส่ไว้ตรงนี้
     }
   </script>
 </body>
