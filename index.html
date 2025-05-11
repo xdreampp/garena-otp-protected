@@ -10,6 +10,10 @@
   <style>
     body { font-family: 'Noto Sans Thai', sans-serif; }
     .progress-bar { transition: width 1s linear, background-color 0.3s ease; }
+    .otp-blur {
+      filter: blur(8px);
+      user-select: none;
+    }
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-4">
@@ -169,7 +173,15 @@
           <div class="text-center md:text-left">
             <div class="text-2xl font-semibold text-blue-700">${acc.name} ${acc.group ? `<span class="text-sm text-gray-400">(${acc.group})</span>` : ''}</div>
             <div class="text-sm text-gray-500 mt-1">เพิ่มเมื่อ : ${formatThaiDate(acc.addedAt)}</div>
-            <div class="text-4xl font-mono mt-2 tracking-widest">${otp}</div>
+            <div class="text-4xl font-mono mt-2 tracking-widest select-none relative">
+              <span 
+                id="otp-${i}" 
+                class="otp-blur cursor-pointer inline-block transition duration-200"
+                onmousedown="revealOTP(${i})"
+                onmouseup="hideOTP(${i})"
+                onmouseleave="hideOTP(${i})"
+              >${otp}</span>
+            </div>
             <div class="mt-3 relative h-3 bg-gray-300 rounded overflow-hidden w-full">
               <div id="progress-${i}" class="absolute h-3 bg-green-500 rounded progress-bar" style="width: 100%"></div>
             </div>
@@ -183,6 +195,16 @@
         container.appendChild(card);
         updateProgress(i);
       }
+    }
+
+    function revealOTP(index) {
+      const el = document.getElementById(`otp-${index}`);
+      if (el) el.classList.remove("otp-blur");
+    }
+
+    function hideOTP(index) {
+      const el = document.getElementById(`otp-${index}`);
+      if (el) el.classList.add("otp-blur");
     }
 
     function editAccount(index) {
